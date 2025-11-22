@@ -19,7 +19,7 @@ export async function startMCPServer(): Promise<void> {
   const server = new Server(
     {
       name: 'ai-live-terminal-bridge',
-      version: '1.3.1',
+      version: '1.3.2',
     },
     {
       capabilities: {

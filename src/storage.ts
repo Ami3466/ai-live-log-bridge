@@ -7,6 +7,8 @@ import { getMasterIndexPath, getActiveSessions } from './session.js';
  * Shared storage configuration for all modes
  */
 export const MCP_DIR = join(homedir(), '.mcp-logs');
+export const ACTIVE_DIR = join(MCP_DIR, 'active');
+export const INACTIVE_DIR = join(MCP_DIR, 'inactive');
 export const LOG_FILE = join(MCP_DIR, 'session.log'); // Legacy single file (for backwards compatibility)
 
 /**
@@ -15,6 +17,12 @@ export const LOG_FILE = join(MCP_DIR, 'session.log'); // Legacy single file (for
 export function ensureStorageExists(): void {
   if (!existsSync(MCP_DIR)) {
     mkdirSync(MCP_DIR, { recursive: true });
+  }
+  if (!existsSync(ACTIVE_DIR)) {
+    mkdirSync(ACTIVE_DIR, { recursive: true });
+  }
+  if (!existsSync(INACTIVE_DIR)) {
+    mkdirSync(INACTIVE_DIR, { recursive: true });
   }
 }
 
@@ -71,7 +79,10 @@ export function getSessionIdsForProject(projectDir: string, liveOnly: boolean = 
 export function getSessionLogFiles(limit?: number, projectDir?: string, liveOnly: boolean = true): string[] {
   ensureStorageExists();
 
-  if (!existsSync(MCP_DIR)) {
+  // Determine which directory to read from
+  const searchDir = liveOnly ? ACTIVE_DIR : INACTIVE_DIR;
+
+  if (!existsSync(searchDir)) {
     return [];
   }
 
@@ -80,9 +91,9 @@ export function getSessionLogFiles(limit?: number, projectDir?: string, liveOnly
     const sessionIds = getSessionIdsForProject(projectDir, liveOnly);
     const files = sessionIds
       .map(id => ({
-        path: join(MCP_DIR, `session-${id}.log`),
-        mtime: existsSync(join(MCP_DIR, `session-${id}.log`))
-          ? statSync(join(MCP_DIR, `session-${id}.log`)).mtime.getTime()
+        path: join(searchDir, `session-${id}.log`),
+        mtime: existsSync(join(searchDir, `session-${id}.log`))
+          ? statSync(join(searchDir, `session-${id}.log`)).mtime.getTime()
           : 0
       }))
       .filter(f => f.mtime > 0)
@@ -97,9 +108,9 @@ export function getSessionLogFiles(limit?: number, projectDir?: string, liveOnly
     const activeSessionIds = getActiveSessions();
     const files = activeSessionIds
       .map(id => ({
-        path: join(MCP_DIR, `session-${id}.log`),
-        mtime: existsSync(join(MCP_DIR, `session-${id}.log`))
-          ? statSync(join(MCP_DIR, `session-${id}.log`)).mtime.getTime()
+        path: join(searchDir, `session-${id}.log`),
+        mtime: existsSync(join(searchDir, `session-${id}.log`))
+          ? statSync(join(searchDir, `session-${id}.log`)).mtime.getTime()
           : 0
       }))
       .filter(f => f.mtime > 0)
@@ -109,12 +120,12 @@ export function getSessionLogFiles(limit?: number, projectDir?: string, liveOnly
     return limit ? files.slice(0, limit) : files;
   }
 
-  // Otherwise, get all session files from disk
-  const files = readdirSync(MCP_DIR)
+  // Otherwise, get all session files from the appropriate directory
+  const files = readdirSync(searchDir)
     .filter(file => file.startsWith('session-') && file.endsWith('.log'))
     .map(file => ({
-      path: join(MCP_DIR, file),
-      mtime: statSync(join(MCP_DIR, file)).mtime.getTime()
+      path: join(searchDir, file),
+      mtime: statSync(join(searchDir, file)).mtime.getTime()
     }))
     .sort((a, b) => b.mtime - a.mtime) // Most recent first
     .map(f => f.path);

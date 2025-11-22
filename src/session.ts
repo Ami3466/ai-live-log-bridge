@@ -1,7 +1,7 @@
 import { randomBytes } from 'crypto';
-import { writeFileSync, readFileSync, existsSync, unlinkSync } from 'fs';
+import { writeFileSync, readFileSync, existsSync, unlinkSync, renameSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
-import { MCP_DIR } from './storage.js';
+import { MCP_DIR, ACTIVE_DIR, INACTIVE_DIR } from './storage.js';
 
 /**
  * Session Management
@@ -21,9 +21,12 @@ export function generateSessionId(): string {
 
 /**
  * Get the session log file path for a given session ID
+ * @param sessionId The session ID
+ * @param active If true, return path in active directory, otherwise inactive (default: true)
  */
-export function getSessionLogPath(sessionId: string): string {
-  return join(MCP_DIR, `session-${sessionId}.log`);
+export function getSessionLogPath(sessionId: string, active: boolean = true): string {
+  const dir = active ? ACTIVE_DIR : INACTIVE_DIR;
+  return join(dir, `session-${sessionId}.log`);
 }
 
 /**
@@ -126,11 +129,11 @@ export function markSessionActive(sessionId: string, projectDir: string): void {
 }
 
 /**
- * Mark a session as completed and optionally delete its log
+ * Mark a session as completed and move its log to inactive directory
  * @param sessionId The session ID
- * @param deleteLog Whether to delete the log file (default: true)
+ * @param archiveLog Whether to archive the log file to inactive directory (default: true)
  */
-export function markSessionCompleted(sessionId: string, deleteLog: boolean = true): void {
+export function markSessionCompleted(sessionId: string, archiveLog: boolean = true): void {
   const activePath = getActiveSessionsPath();
 
   if (existsSync(activePath)) {
@@ -140,11 +143,19 @@ export function markSessionCompleted(sessionId: string, deleteLog: boolean = tru
     writeFileSync(activePath, JSON.stringify(active, null, 2), 'utf-8');
   }
 
-  // Delete the log file if requested
-  if (deleteLog) {
-    const logPath = getSessionLogPath(sessionId);
-    if (existsSync(logPath)) {
-      unlinkSync(logPath);
+  // Move the log file to inactive directory if requested
+  if (archiveLog) {
+    const activeLogPath = getSessionLogPath(sessionId, true);
+    const inactiveLogPath = getSessionLogPath(sessionId, false);
+
+    if (existsSync(activeLogPath)) {
+      renameSync(activeLogPath, inactiveLogPath);
+    }
+  } else {
+    // Delete if not archiving
+    const activeLogPath = getSessionLogPath(sessionId, true);
+    if (existsSync(activeLogPath)) {
+      unlinkSync(activeLogPath);
     }
   }
 }
@@ -206,4 +217,35 @@ export function cleanupStaleSessions(maxAgeMinutes: number = 60): number {
   }
 
   return cleanedCount;
+}
+
+/**
+ * Clean up old inactive logs (logs older than retentionDays)
+ * @param retentionDays Number of days to retain inactive logs (default: 7)
+ * @returns Number of old logs deleted
+ */
+export function cleanupOldInactiveLogs(retentionDays: number = 7): number {
+  if (!existsSync(INACTIVE_DIR)) {
+    return 0;
+  }
+
+  const now = new Date().getTime();
+  const maxAgeMs = retentionDays * 24 * 60 * 60 * 1000;
+  let deletedCount = 0;
+
+  const files = readdirSync(INACTIVE_DIR)
+    .filter(file => file.startsWith('session-') && file.endsWith('.log'));
+
+  for (const file of files) {
+    const filePath = join(INACTIVE_DIR, file);
+    const stats = statSync(filePath);
+    const age = now - stats.mtime.getTime();
+
+    if (age > maxAgeMs) {
+      unlinkSync(filePath);
+      deletedCount++;
+    }
+  }
+
+  return deletedCount;
 }

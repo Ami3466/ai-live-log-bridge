@@ -3,7 +3,7 @@ import { createWriteStream } from 'fs';
 import stripAnsi from 'strip-ansi';
 import chalk from 'chalk';
 import { ensureStorageExists } from './storage.js';
-import { generateSessionId, getSessionLogPath, registerSession, markSessionActive, markSessionCompleted, cleanupStaleSessions } from './session.js';
+import { generateSessionId, getSessionLogPath, registerSession, markSessionActive, markSessionCompleted, cleanupStaleSessions, cleanupOldInactiveLogs } from './session.js';
 import { redactSecrets } from './redact-secrets.js';
 
 /**
@@ -20,6 +20,10 @@ export async function runCommandWrapper(command: string, args: string[]): Promis
   const keepDays = parseInt(process.env.AI_KEEP_LOGS || '1', 10);
   const maxAgeMinutes = keepDays * 24 * 60; // Convert days to minutes
   cleanupStaleSessions(maxAgeMinutes);
+
+  // Clean up old inactive logs (older than keepDays)
+  // This keeps the inactive directory from growing indefinitely
+  cleanupOldInactiveLogs(keepDays);
 
   // Generate unique session ID for this command execution
   const sessionId = generateSessionId();
@@ -98,12 +102,11 @@ export async function runCommandWrapper(command: string, args: string[]): Promis
         logStream.write(`\nProcess error: ${error.message}\n`);
         logStream.end(() => {
           // AI_KEEP_LOGS controls log retention (in days)
-          // 0 = delete immediately (default)
-          // 1 = keep for 1 day
-          // 7 = keep for 7 days, etc.
+          // 0 = delete immediately, don't archive
+          // 1+ = archive to inactive directory for X days
           const keepDays = parseInt(process.env.AI_KEEP_LOGS || '1', 10);
-          const deleteLog = keepDays === 0;
-          markSessionCompleted(sessionId, deleteLog);
+          const archiveLog = keepDays > 0;
+          markSessionCompleted(sessionId, archiveLog);
           reject(error);
         });
       }
@@ -118,12 +121,11 @@ export async function runCommandWrapper(command: string, args: string[]): Promis
         // Wait for stream to finish before continuing
         logStream.end(() => {
           // AI_KEEP_LOGS controls log retention (in days)
-          // 0 = delete immediately (default)
-          // 1 = keep for 1 day
-          // 7 = keep for 7 days, etc.
+          // 0 = delete immediately, don't archive
+          // 1+ = archive to inactive directory for X days
           const keepDays = parseInt(process.env.AI_KEEP_LOGS || '1', 10);
-          const deleteLog = keepDays === 0;
-          markSessionCompleted(sessionId, deleteLog);
+          const archiveLog = keepDays > 0;
+          markSessionCompleted(sessionId, archiveLog);
 
           if (code === 0) {
             console.log(chalk.green(`\n✅ Command completed successfully`));
