@@ -1,5 +1,5 @@
 import { randomBytes } from 'crypto';
-import { writeFileSync, readFileSync, existsSync } from 'fs';
+import { writeFileSync, readFileSync, existsSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { MCP_DIR } from './storage.js';
 
@@ -38,11 +38,13 @@ export function getMasterIndexPath(): string {
  * Register a new session in the master index
  * @param sessionId The session ID to register
  * @param command The command being executed
+ * @param args The command arguments
+ * @param cwd The working directory where the command was executed
  */
-export function registerSession(sessionId: string, command: string, args: string[]): void {
+export function registerSession(sessionId: string, command: string, args: string[], cwd: string): void {
   const timestamp = new Date().toISOString();
   const fullCommand = `${command} ${args.join(' ')}`;
-  const entry = `[${timestamp}] [${sessionId}] ${fullCommand}\n`;
+  const entry = `[${timestamp}] [${sessionId}] [${cwd}] ${fullCommand}\n`;
 
   const masterPath = getMasterIndexPath();
 
@@ -91,4 +93,80 @@ export function getAllSessionIds(): string[] {
 export function getRecentSessionIds(count: number): string[] {
   const allIds = getAllSessionIds();
   return allIds.slice(-count).reverse(); // Most recent first
+}
+
+/**
+ * Get the active sessions file path
+ * This file tracks currently running sessions
+ */
+export function getActiveSessionsPath(): string {
+  return join(MCP_DIR, 'active-sessions.json');
+}
+
+/**
+ * Mark a session as active (running)
+ * @param sessionId The session ID
+ * @param projectDir The project directory
+ */
+export function markSessionActive(sessionId: string, projectDir: string): void {
+  const activePath = getActiveSessionsPath();
+  let active: Record<string, { projectDir: string; startTime: string }> = {};
+
+  if (existsSync(activePath)) {
+    const content = readFileSync(activePath, 'utf-8');
+    active = JSON.parse(content);
+  }
+
+  active[sessionId] = {
+    projectDir,
+    startTime: new Date().toISOString()
+  };
+
+  writeFileSync(activePath, JSON.stringify(active, null, 2), 'utf-8');
+}
+
+/**
+ * Mark a session as completed and optionally delete its log
+ * @param sessionId The session ID
+ * @param deleteLog Whether to delete the log file (default: true)
+ */
+export function markSessionCompleted(sessionId: string, deleteLog: boolean = true): void {
+  const activePath = getActiveSessionsPath();
+
+  if (existsSync(activePath)) {
+    const content = readFileSync(activePath, 'utf-8');
+    const active = JSON.parse(content);
+    delete active[sessionId];
+    writeFileSync(activePath, JSON.stringify(active, null, 2), 'utf-8');
+  }
+
+  // Delete the log file if requested
+  if (deleteLog) {
+    const logPath = getSessionLogPath(sessionId);
+    if (existsSync(logPath)) {
+      unlinkSync(logPath);
+    }
+  }
+}
+
+/**
+ * Get all active session IDs for a specific project
+ * @param projectDir The project directory (optional - returns all if not specified)
+ * @returns Array of active session IDs
+ */
+export function getActiveSessions(projectDir?: string): string[] {
+  const activePath = getActiveSessionsPath();
+
+  if (!existsSync(activePath)) {
+    return [];
+  }
+
+  const content = readFileSync(activePath, 'utf-8');
+  const active: Record<string, { projectDir: string; startTime: string }> = JSON.parse(content);
+
+  if (projectDir) {
+    return Object.keys(active).filter(id => active[id].projectDir === projectDir);
+  }
+
+  return Object.keys(active);
 }

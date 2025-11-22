@@ -3,7 +3,7 @@ import { createWriteStream } from 'fs';
 import stripAnsi from 'strip-ansi';
 import chalk from 'chalk';
 import { ensureStorageExists } from './storage.js';
-import { generateSessionId, getSessionLogPath, registerSession } from './session.js';
+import { generateSessionId, getSessionLogPath, registerSession, markSessionActive, markSessionCompleted } from './session.js';
 import { redactSecrets } from './redact-secrets.js';
 
 /**
@@ -19,16 +19,20 @@ export async function runCommandWrapper(command: string, args: string[]): Promis
   const sessionId = generateSessionId();
   const logFilePath = getSessionLogPath(sessionId);
 
-  // Register this session in the master index
-  registerSession(sessionId, command, args);
+  // Register this session in the master index with current working directory
+  const cwd = process.cwd();
+  registerSession(sessionId, command, args, cwd);
+
+  // Mark this session as active
+  markSessionActive(sessionId, cwd);
 
   // Create log file stream for this session
   const logStream = createWriteStream(logFilePath, { flags: 'w' }); // 'w' = new file
 
-  // Write header to log file
+  // Write header to log file with project directory
   const timestamp = new Date().toISOString();
   const fullCommand = `${command} ${args.join(' ')}`;
-  const header = `${'='.repeat(80)}\n[${timestamp}] Session: ${sessionId}\n[${timestamp}] Command: ${fullCommand}\n${'='.repeat(80)}\n`;
+  const header = `${'='.repeat(80)}\n[${timestamp}] Session: ${sessionId}\n[${timestamp}] Project: ${cwd}\n[${timestamp}] Command: ${fullCommand}\n${'='.repeat(80)}\n`;
   logStream.write(header);
 
   // Show session ID to user
@@ -87,6 +91,8 @@ export async function runCommandWrapper(command: string, args: string[]): Promis
         streamClosed = true;
         logStream.write(`\nProcess error: ${error.message}\n`);
         logStream.end(() => {
+          // Mark session as completed and delete the log
+          markSessionCompleted(sessionId, true);
           reject(error);
         });
       }
@@ -100,6 +106,9 @@ export async function runCommandWrapper(command: string, args: string[]): Promis
 
         // Wait for stream to finish before continuing
         logStream.end(() => {
+          // Mark session as completed and delete the log file
+          markSessionCompleted(sessionId, true);
+
           if (code === 0) {
             console.log(chalk.green(`\n✅ Command completed successfully`));
             resolve();

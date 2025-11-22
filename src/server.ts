@@ -32,7 +32,7 @@ export async function startMCPServer(): Promise<void> {
   const tools: Tool[] = [
     {
       name: 'view_logs',
-      description: 'View recent terminal session logs. Use this anytime the user wants to see what commands were run and their output, check on progress, or understand what happened. Works with or without errors. Perfect for casual log viewing.\n\nIMPORTANT: All terminal commands MUST be executed using the \'ai\' wrapper (e.g., \'ai npm test\', \'ai npm start\', \'ai python script.py\'). This ensures commands appear in logs and in the user\'s live viewer. Commands run without \'ai\' will NOT be logged.',
+      description: 'View LIVE terminal session logs for the CURRENT PROJECT only. Shows ONLY currently running commands - completed commands are automatically removed.\n\nAutomatically filters to show:\n- ✅ Only sessions from the current working directory\n- ✅ Only LIVE/ACTIVE sessions (running commands)\n- ❌ Completed sessions are auto-deleted\n\nUse this to monitor what commands are currently running and their real-time output.\n\nIMPORTANT: All terminal commands MUST be executed using the \'ai\' wrapper (e.g., \'ai npm test\', \'ai npm start\', \'ai python script.py\'). This ensures commands appear in logs and in the user\'s live viewer. Commands run without \'ai\' will NOT be logged.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -45,7 +45,7 @@ export async function startMCPServer(): Promise<void> {
     },
     {
       name: 'get_crash_context',
-      description: 'Read the session log file specifically to get crash context and debug errors. Use this when investigating crashes, failures, or when the user asks about errors. For general log viewing, use view_logs instead.\n\nIMPORTANT: All terminal commands MUST be executed using the \'ai\' wrapper (e.g., \'ai npm test\', \'ai npm start\', \'ai python script.py\'). This ensures commands appear in logs and in the user\'s live viewer. Commands run without \'ai\' will NOT be logged.',
+      description: 'Read crash context and debug errors from LIVE sessions for the CURRENT PROJECT only. Shows ONLY currently running commands.\n\nAutomatically filters to show:\n- ✅ Only sessions from the current working directory\n- ✅ Only LIVE/ACTIVE sessions (running commands)\n- ❌ Completed sessions are auto-deleted\n\nUse this when investigating crashes or errors in currently running commands.\n\nIMPORTANT: All terminal commands MUST be executed using the \'ai\' wrapper (e.g., \'ai npm test\', \'ai npm start\', \'ai python script.py\'). This ensures commands appear in logs and in the user\'s live viewer. Commands run without \'ai\' will NOT be logged.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -58,7 +58,7 @@ export async function startMCPServer(): Promise<void> {
     },
     {
       name: 'auto_fix_errors',
-      description: 'Automatically detect and analyze errors in the session log. Use this when the user mentions errors, asks for fixes, or says "auto fix". Returns detected errors with context and suggestions.\n\nIMPORTANT: All terminal commands MUST be executed using the \'ai\' wrapper (e.g., \'ai npm test\', \'ai npm start\', \'ai python script.py\'). This ensures commands appear in logs and in the user\'s live viewer. Commands run without \'ai\' will NOT be logged.',
+      description: 'Automatically detect and analyze errors from LIVE sessions for the CURRENT PROJECT only. Shows ONLY currently running commands.\n\nAutomatically filters to show:\n- ✅ Only sessions from the current working directory\n- ✅ Only LIVE/ACTIVE sessions (running commands)\n- ❌ Completed sessions are auto-deleted\n\nUse this when debugging errors in currently running commands. Returns detected errors with context and suggestions.\n\nIMPORTANT: All terminal commands MUST be executed using the \'ai\' wrapper (e.g., \'ai npm test\', \'ai npm start\', \'ai python script.py\'). This ensures commands appear in logs and in the user\'s live viewer. Commands run without \'ai\' will NOT be logged.',
       inputSchema: {
         type: 'object',
         properties: {
