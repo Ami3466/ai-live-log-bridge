@@ -3,7 +3,7 @@ import { createWriteStream } from 'fs';
 import stripAnsi from 'strip-ansi';
 import chalk from 'chalk';
 import { ensureStorageExists } from './storage.js';
-import { generateSessionId, getSessionLogPath, registerSession, markSessionActive, markSessionCompleted } from './session.js';
+import { generateSessionId, getSessionLogPath, registerSession, markSessionActive, markSessionCompleted, cleanupStaleSessions } from './session.js';
 import { redactSecrets } from './redact-secrets.js';
 
 /**
@@ -14,6 +14,12 @@ import { redactSecrets } from './redact-secrets.js';
 export async function runCommandWrapper(command: string, args: string[]): Promise<void> {
   // Ensure storage directory exists
   ensureStorageExists();
+
+  // Clean up stale sessions based on AI_KEEP_LOGS setting
+  // Default is 1 day, or use configured value
+  const keepDays = parseInt(process.env.AI_KEEP_LOGS || '1', 10);
+  const maxAgeMinutes = keepDays * 24 * 60; // Convert days to minutes
+  cleanupStaleSessions(maxAgeMinutes);
 
   // Generate unique session ID for this command execution
   const sessionId = generateSessionId();
@@ -91,8 +97,13 @@ export async function runCommandWrapper(command: string, args: string[]): Promis
         streamClosed = true;
         logStream.write(`\nProcess error: ${error.message}\n`);
         logStream.end(() => {
-          // Mark session as completed and delete the log
-          markSessionCompleted(sessionId, true);
+          // AI_KEEP_LOGS controls log retention (in days)
+          // 0 = delete immediately (default)
+          // 1 = keep for 1 day
+          // 7 = keep for 7 days, etc.
+          const keepDays = parseInt(process.env.AI_KEEP_LOGS || '1', 10);
+          const deleteLog = keepDays === 0;
+          markSessionCompleted(sessionId, deleteLog);
           reject(error);
         });
       }
@@ -106,8 +117,13 @@ export async function runCommandWrapper(command: string, args: string[]): Promis
 
         // Wait for stream to finish before continuing
         logStream.end(() => {
-          // Mark session as completed and delete the log file
-          markSessionCompleted(sessionId, true);
+          // AI_KEEP_LOGS controls log retention (in days)
+          // 0 = delete immediately (default)
+          // 1 = keep for 1 day
+          // 7 = keep for 7 days, etc.
+          const keepDays = parseInt(process.env.AI_KEEP_LOGS || '1', 10);
+          const deleteLog = keepDays === 0;
+          markSessionCompleted(sessionId, deleteLog);
 
           if (code === 0) {
             console.log(chalk.green(`\n✅ Command completed successfully`));

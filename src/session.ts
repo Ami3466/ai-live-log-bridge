@@ -170,3 +170,40 @@ export function getActiveSessions(projectDir?: string): string[] {
 
   return Object.keys(active);
 }
+
+/**
+ * Clean up stale sessions (sessions older than maxAgeMinutes)
+ * This should be called when the ai wrapper starts to remove zombie sessions
+ * from interrupted terminals.
+ * @param maxAgeMinutes Maximum age of active sessions in minutes (default: 60)
+ * @returns Number of stale sessions cleaned up
+ */
+export function cleanupStaleSessions(maxAgeMinutes: number = 60): number {
+  const activePath = getActiveSessionsPath();
+
+  if (!existsSync(activePath)) {
+    return 0;
+  }
+
+  const content = readFileSync(activePath, 'utf-8');
+  const active: Record<string, { projectDir: string; startTime: string }> = JSON.parse(content);
+
+  const now = new Date().getTime();
+  const maxAgeMs = maxAgeMinutes * 60 * 1000;
+  let cleanedCount = 0;
+
+  // Find stale sessions
+  const staleSessionIds = Object.keys(active).filter(sessionId => {
+    const startTime = new Date(active[sessionId].startTime).getTime();
+    const age = now - startTime;
+    return age > maxAgeMs;
+  });
+
+  // Clean up stale sessions
+  for (const sessionId of staleSessionIds) {
+    markSessionCompleted(sessionId, true);
+    cleanedCount++;
+  }
+
+  return cleanedCount;
+}

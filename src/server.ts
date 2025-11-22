@@ -19,7 +19,7 @@ export async function startMCPServer(): Promise<void> {
   const server = new Server(
     {
       name: 'ai-live-terminal-bridge',
-      version: '1.1.1',
+      version: '1.3.1',
     },
     {
       capabilities: {
@@ -92,7 +92,7 @@ export async function startMCPServer(): Promise<void> {
       if (name === 'view_logs') {
         const lines = (args?.lines as number) || 100;
 
-        const sessionFiles = getSessionLogFiles();
+        const sessionFiles = getSessionLogFiles(undefined, process.cwd(), true);
 
         // Check if we have any logs (session files or legacy file)
         if (sessionFiles.length === 0 && !existsSync(LOG_FILE)) {
@@ -107,7 +107,7 @@ export async function startMCPServer(): Promise<void> {
         }
 
         // Use the new readRecentLogs function to read from session files
-        const recentLines = readRecentLogs(lines);
+        const recentLines = readRecentLogs(lines, 10, process.cwd(), true);
 
         return {
           content: [
@@ -122,7 +122,7 @@ export async function startMCPServer(): Promise<void> {
       if (name === 'get_crash_context') {
         const lines = (args?.lines as number) || 100;
 
-        const sessionFiles = getSessionLogFiles();
+        const sessionFiles = getSessionLogFiles(undefined, process.cwd(), true);
 
         // Check if we have any logs (session files or legacy file)
         if (sessionFiles.length === 0 && !existsSync(LOG_FILE)) {
@@ -137,7 +137,7 @@ export async function startMCPServer(): Promise<void> {
         }
 
         // Use the new readRecentLogs function to read from session files
-        const content = readRecentLogs(lines);
+        const content = readRecentLogs(lines, 10, process.cwd(), true);
         const recentLines = content.split('\n');
 
         // Error detection patterns (same as auto_fix_errors)
@@ -189,7 +189,7 @@ export async function startMCPServer(): Promise<void> {
       if (name === 'auto_fix_errors') {
         const lines = (args?.lines as number) || 200;
 
-        const sessionFiles = getSessionLogFiles();
+        const sessionFiles = getSessionLogFiles(undefined, process.cwd(), true);
 
         // Check if we have any logs (session files or legacy file)
         if (sessionFiles.length === 0 && !existsSync(LOG_FILE)) {
@@ -204,7 +204,7 @@ export async function startMCPServer(): Promise<void> {
         }
 
         // Use the new readRecentLogs function to read from session files
-        const content = readRecentLogs(lines);
+        const content = readRecentLogs(lines, 10, process.cwd(), true);
         const recentLines = content.split('\n');
 
         // Error detection patterns

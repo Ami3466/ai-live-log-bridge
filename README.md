@@ -750,6 +750,45 @@ echo ".mcp-logs/" >> ~/.gitignore_global
 
 ---
 
+## Configuration
+
+### Log Retention
+
+Control how long completed command logs are kept using the `AI_KEEP_LOGS` environment variable (in days).
+
+**Default: 1 day** - Completed logs are kept for 1 day, then auto-cleaned to prevent confusing the AI with old output.
+
+**Configuration options:**
+```bash
+# Delete logs immediately when command completes (cleanest for LLM)
+export AI_KEEP_LOGS=0
+ai npm test
+
+# Keep logs for 1 day (default - no need to set)
+export AI_KEEP_LOGS=1
+ai npm test
+
+# Keep logs for 7 days
+export AI_KEEP_LOGS=7
+ai npm test
+
+# Keep logs for 30 days
+export AI_KEEP_LOGS=30
+ai npm test
+```
+
+**Why control log retention?**
+- ✅ **AI_KEEP_LOGS=0**: LLM only sees live/running commands (cleanest, recommended)
+- ✅ **AI_KEEP_LOGS=1**: Keep recent logs for debugging (balanced, default)
+- ✅ **AI_KEEP_LOGS=7+**: Keep logs longer for audit trails or reference
+
+**Cleanup behavior:**
+- Completed logs: Kept for N days (default: 1 day), then auto-cleaned
+- Stale sessions: Cleaned on next `ai` command based on `AI_KEEP_LOGS` setting
+- Interrupted sessions: Cleaned up when they exceed the retention period
+
+---
+
 ## Troubleshooting
 
 ### `ai: command not found`
