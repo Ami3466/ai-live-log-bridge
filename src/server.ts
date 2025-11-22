@@ -215,7 +215,7 @@ export async function startMCPServer(): Promise<void> {
           content: [
             {
               type: 'text',
-              text: `# Crash Context (Errors Only)\n\nFound ${errorLines.length} error-related line(s):\n\n\`\`\`\n${errorLines.join('\n')}\n\`\`\`\n\nFor full logs including non-error output, use the view_logs tool.`,
+              text: `Crash Context (Errors Only)\n\nFound ${errorLines.length} error-related line(s):\n\n\`\`\`\n${errorLines.join('\n')}\n\`\`\`\n\nFor full logs including non-error output, use the view_logs tool.`,
             },
           ],
         };
@@ -288,9 +288,9 @@ export async function startMCPServer(): Promise<void> {
         }
 
         // Build error report
-        let report = `# 🔴 Auto-Fix Analysis\n\n`;
+        let report = `🔴 Auto-Fix Analysis\n\n`;
         report += `Found ${errors.length} error indicator(s) in the last ${lines} lines.\n\n`;
-        report += `## Detected Issues:\n\n`;
+        report += `Detected Issues:\n\n`;
 
         // Group consecutive stack traces - keep only first stack trace in a sequence
         const uniqueErrors: typeof errors = [];
@@ -311,9 +311,9 @@ export async function startMCPServer(): Promise<void> {
           report += `... and ${uniqueErrors.length - 10} more error(s)\n\n`;
         }
 
-        report += `## Full Error Context:\n\n`;
+        report += `Full Error Context:\n\n`;
         report += `\`\`\`\n${recentLines.join('\n')}\n\`\`\`\n\n`;
-        report += `## Suggested Next Steps:\n\n`;
+        report += `Suggested Next Steps:\n\n`;
         report += `1. Analyze the error messages above\n`;
         report += `2. Check the full context for root cause\n`;
         report += `3. Provide specific fixes for each issue\n`;
@@ -330,9 +330,9 @@ export async function startMCPServer(): Promise<void> {
       }
 
       if (name === 'get_usage_instructions') {
-        const instructions = `# AI Live Log Bridge - Usage Instructions
+        const instructions = `AI Live Log Bridge - Usage Instructions
 
-## 🚨 CRITICAL: Running Commands
+🚨 CRITICAL: Running Commands
 
 **ALL terminal commands MUST be executed using the 'ai' wrapper:**
 
@@ -349,7 +349,7 @@ export async function startMCPServer(): Promise<void> {
 - npm start
 - python script.py
 
-## Why This Matters
+Why This Matters
 
 Commands run WITHOUT the 'ai' wrapper will:
 - ❌ NOT appear in logs
@@ -363,7 +363,7 @@ Commands run WITH the 'ai' wrapper will:
 - ✅ Be readable by view_logs, get_crash_context, and auto_fix_errors
 - ✅ Enable proper debugging and error analysis
 
-## When to Use Each MCP Tool
+When to Use Each MCP Tool
 
 1. **view_logs** - View ALL recent terminal output (commands, output, errors)
    - Use when: User asks "what's in the logs?" or "what happened?"
@@ -377,7 +377,7 @@ Commands run WITH the 'ai' wrapper will:
    - Use when: User says "auto fix this" or "debug these errors"
    - Shows: Comprehensive error analysis with suggestions
 
-## Remember
+Remember
 
 Every time you run a terminal command, use the 'ai' wrapper. No exceptions.
 
@@ -426,7 +426,7 @@ This is not optional - it's required for the system to work.`;
             content: [
               {
                 type: 'text',
-                text: `# ❌ No Browser Logs Found\n\nNo active browser sessions detected for this project.\n\n${setupChecks.join('\n')}`,
+                text: `❌ No Browser Logs Found\n\nNo active browser sessions detected for this project.\n\n${setupChecks.join('\n')}`,
               },
             ],
           };
@@ -454,7 +454,7 @@ This is not optional - it's required for the system to work.`;
             content: [
               {
                 type: 'text',
-                text: '# ❌ No Browser Logs Found\n\nCannot check for browser errors - no active browser sessions detected.\n\n**Quick Diagnostics:**\n  1. Run: `npm run verify-browser-setup`\n  2. Check that you have a localhost page open in Chrome\n  3. Verify extension is loaded at chrome://extensions/\n\nFor installation instructions, use the `get_browser_instructions` tool.',
+                text: '❌ No Browser Logs Found\n\nCannot check for browser errors - no active browser sessions detected.\n\n**Quick Diagnostics:**\n  1. Run: `npm run verify-browser-setup`\n  2. Check that you have a localhost page open in Chrome\n  3. Verify extension is loaded at chrome://extensions/\n\nFor installation instructions, use the `get_browser_instructions` tool.',
               },
             ],
           };
@@ -501,18 +501,18 @@ This is not optional - it's required for the system to work.`;
           content: [
             {
               type: 'text',
-              text: `# Browser Errors (Filtered)\n\nFound ${errorLines.length} error-related line(s):\n\n\`\`\`\n${errorLines.join('\n')}\n\`\`\`\n\nFor full browser logs including non-error output, use the view_browser_logs tool.`,
+              text: `Browser Errors (Filtered)\n\nFound ${errorLines.length} error-related line(s):\n\n\`\`\`\n${errorLines.join('\n')}\n\`\`\`\n\nFor full browser logs including non-error output, use the view_browser_logs tool.`,
             },
           ],
         };
       }
 
       if (name === 'get_browser_instructions') {
-        const instructions = `# Browser Monitoring - Installation & Usage
+        const instructions = `Browser Monitoring - Installation & Usage
 
-## 📦 One-Time Setup
+📦 One-Time Setup
 
-### Step 1: Install the Chrome Extension
+Step 1: Install the Chrome Extension
 
 The Chrome extension is located on your Desktop:
 
@@ -520,7 +520,7 @@ The Chrome extension is located on your Desktop:
 cd ~/Desktop/ai-live-log-bridge-extension
 \`\`\`
 
-### Step 2: Load Extension in Chrome
+Step 2: Load Extension in Chrome
 
 1. Open Chrome and go to: \`chrome://extensions/\`
 2. Enable "Developer mode" (toggle in top right)
@@ -528,13 +528,13 @@ cd ~/Desktop/ai-live-log-bridge-extension
 4. Select the folder: \`~/Desktop/ai-live-log-bridge-extension\`
 5. The extension should now appear in your extensions list
 
-### Step 3: Verify Connection
+Step 3: Verify Connection
 
 1. Open Chrome DevTools (F12) on any localhost page
 2. Check the extension icon - it should show "Connected"
 3. If it shows "Disconnected", refresh the page
 
-## 🎯 How It Works
+🎯 How It Works
 
 Once installed, the extension automatically:
 
@@ -554,23 +554,23 @@ Once installed, the extension automatically:
    - Secrets are automatically redacted (cookies, tokens, API keys)
    - Logs are stored in ~/.mcp-logs/browser/
 
-## 📋 MCP Tools Available
+📋 MCP Tools Available
 
-### view_browser_logs
+view_browser_logs
 View all browser activity (console + network):
 \`\`\`
 Use when: User wants to see what's happening in the browser
 Shows: Console logs, network requests, errors, performance metrics
 \`\`\`
 
-### get_browser_errors
+get_browser_errors
 View only errors and failed requests:
 \`\`\`
 Use when: Debugging browser issues, API failures
 Shows: Only console.error, exceptions, HTTP errors (4xx/5xx)
 \`\`\`
 
-## 🔍 Example Usage
+🔍 Example Usage
 
 **User workflow:**
 1. User runs: \`ai npm run dev\` (starts localhost:3000)
@@ -583,14 +583,14 @@ Shows: Only console.error, exceptions, HTTP errors (4xx/5xx)
 **User response:** "Just check it yourself!"
 **You do:** Use \`get_browser_errors\` tool → See all errors immediately
 
-## ⚠️ Important Notes
+⚠️ Important Notes
 
 - Extension only monitors **localhost:*** pages (for security)
 - All secrets are redacted before reaching you
 - Browser sessions are tied to the project directory
 - Only LIVE/ACTIVE sessions are shown (completed sessions auto-archive)
 
-## 🐛 Troubleshooting
+🐛 Troubleshooting
 
 **Extension not connecting?**
 - Refresh the localhost page
