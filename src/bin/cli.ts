@@ -11,7 +11,7 @@ async function main() {
   const args = process.argv.slice(2);
 
   // Mode A: MCP Server (ai --server)
-  // Used by Claude Desktop
+  // Used by any MCP-compatible AI tool (Claude Desktop, Claude Code, Cursor, Windsurf, etc.)
   if (args.includes('--server')) {
     console.error(chalk.cyan('🚀 Starting MCP Server...'));
     await startMCPServer();
@@ -145,7 +145,7 @@ async function main() {
     console.log(chalk.white('  ai <command>           ') + chalk.gray('Run command with logging'));
     console.log(chalk.white('  ai live                ') + chalk.gray('Watch logs in real-time (Ctrl+C to exit)'));
     console.log(chalk.white('  ai --last [lines]      ') + chalk.gray('Read last N lines (default: 100)'));
-    console.log(chalk.white('  ai --server            ') + chalk.gray('Start MCP server (for Claude Desktop)'));
+    console.log(chalk.white('  ai --server            ') + chalk.gray('Start MCP server (for MCP-compatible AI tools)'));
     console.log(chalk.gray('\nExamples:'));
     console.log(chalk.white('  ai npm start           ') + chalk.gray('# Run with logging'));
     console.log(chalk.white('  ai live                ') + chalk.gray('# Watch logs live'));

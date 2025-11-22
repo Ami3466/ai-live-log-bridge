@@ -12,13 +12,14 @@ import { LOG_FILE, readRecentLogs, getSessionLogFiles } from './storage.js';
 
 /**
  * MCP Server Mode
- * Used by Claude Desktop - speaks MCP protocol over stdio
+ * Used by any MCP-compatible AI tool (Claude Desktop, Claude Code, Cursor, Windsurf, etc.)
+ * Speaks MCP protocol over stdio
  */
 export async function startMCPServer(): Promise<void> {
   const server = new Server(
     {
       name: 'ai-live-terminal-bridge',
-      version: '1.0.0',
+      version: '1.1.0',
     },
     {
       capabilities: {
@@ -31,7 +32,7 @@ export async function startMCPServer(): Promise<void> {
   const tools: Tool[] = [
     {
       name: 'view_logs',
-      description: 'View recent terminal session logs. Use this anytime the user wants to see what commands were run and their output, check on progress, or understand what happened. Works with or without errors. Perfect for casual log viewing.',
+      description: 'View recent terminal session logs. Use this anytime the user wants to see what commands were run and their output, check on progress, or understand what happened. Works with or without errors. Perfect for casual log viewing.\n\nIMPORTANT: All terminal commands MUST be executed using the \'ai\' wrapper (e.g., \'ai npm test\', \'ai npm start\', \'ai python script.py\'). This ensures commands appear in logs and in the user\'s live viewer. Commands run without \'ai\' will NOT be logged.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -44,7 +45,7 @@ export async function startMCPServer(): Promise<void> {
     },
     {
       name: 'get_crash_context',
-      description: 'Read the session log file specifically to get crash context and debug errors. Use this when investigating crashes, failures, or when the user asks about errors. For general log viewing, use view_logs instead.',
+      description: 'Read the session log file specifically to get crash context and debug errors. Use this when investigating crashes, failures, or when the user asks about errors. For general log viewing, use view_logs instead.\n\nIMPORTANT: All terminal commands MUST be executed using the \'ai\' wrapper (e.g., \'ai npm test\', \'ai npm start\', \'ai python script.py\'). This ensures commands appear in logs and in the user\'s live viewer. Commands run without \'ai\' will NOT be logged.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -57,7 +58,7 @@ export async function startMCPServer(): Promise<void> {
     },
     {
       name: 'auto_fix_errors',
-      description: 'Automatically detect and analyze errors in the session log. Use this when the user mentions errors, asks for fixes, or says "auto fix". Returns detected errors with context and suggestions.',
+      description: 'Automatically detect and analyze errors in the session log. Use this when the user mentions errors, asks for fixes, or says "auto fix". Returns detected errors with context and suggestions.\n\nIMPORTANT: All terminal commands MUST be executed using the \'ai\' wrapper (e.g., \'ai npm test\', \'ai npm start\', \'ai python script.py\'). This ensures commands appear in logs and in the user\'s live viewer. Commands run without \'ai\' will NOT be logged.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -66,6 +67,14 @@ export async function startMCPServer(): Promise<void> {
             description: 'Number of recent lines to analyze (default: 200)',
           },
         },
+      },
+    },
+    {
+      name: 'get_usage_instructions',
+      description: 'Get comprehensive instructions on how to properly use the ai-live-terminal-bridge system. Call this tool to understand the critical requirement to run all commands with the \'ai\' wrapper.',
+      inputSchema: {
+        type: 'object',
+        properties: {},
       },
     },
   ];
@@ -280,6 +289,72 @@ export async function startMCPServer(): Promise<void> {
             {
               type: 'text',
               text: report,
+            },
+          ],
+        };
+      }
+
+      if (name === 'get_usage_instructions') {
+        const instructions = `# AI Live Terminal Bridge - Usage Instructions
+
+## 🚨 CRITICAL: Running Commands
+
+**ALL terminal commands MUST be executed using the 'ai' wrapper:**
+
+✅ CORRECT:
+- ai npm test
+- ai npm start
+- ai npm run build
+- ai python script.py
+- ai docker-compose up
+- ai git status
+
+❌ WRONG (will NOT be logged):
+- npm test
+- npm start
+- python script.py
+
+## Why This Matters
+
+Commands run WITHOUT the 'ai' wrapper will:
+- ❌ NOT appear in logs
+- ❌ NOT be visible in the user's live viewer
+- ❌ NOT be readable by these MCP tools
+- ❌ Break the feedback loop between you and the user
+
+Commands run WITH the 'ai' wrapper will:
+- ✅ Appear in logs immediately
+- ✅ Show in the user's live viewer in real-time
+- ✅ Be readable by view_logs, get_crash_context, and auto_fix_errors
+- ✅ Enable proper debugging and error analysis
+
+## When to Use Each MCP Tool
+
+1. **view_logs** - View ALL recent terminal output (commands, output, errors)
+   - Use when: User asks "what's in the logs?" or "what happened?"
+   - Shows: Complete session history
+
+2. **get_crash_context** - View ONLY errors and crashes (filtered)
+   - Use when: User asks "what caused the crash?" or "show me errors"
+   - Shows: Only error lines, exceptions, stack traces
+
+3. **auto_fix_errors** - Automatically detect and analyze ALL errors
+   - Use when: User says "auto fix this" or "debug these errors"
+   - Shows: Comprehensive error analysis with suggestions
+
+## Remember
+
+Every time you run a terminal command, use the 'ai' wrapper. No exceptions.
+
+Format: ai <command>
+
+This is not optional - it's required for the system to work.`;
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: instructions,
             },
           ],
         };

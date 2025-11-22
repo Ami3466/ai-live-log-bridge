@@ -75,13 +75,39 @@ Now your terminal output is logged and AI can read it.
 
 ## Two Ways to Use This Tool
 
-### CLI Mode (Works Everywhere)
+### 🎯 MCP Mode (Recommended)
 
-No setup required. Works with Claude Code, Cursor, Windsurf, Cline, Continue, Aider, or any AI tool with terminal access.
+**Best for:** Any AI tool that supports MCP (Model Context Protocol), including Claude Desktop, Claude Code, Cursor, Windsurf, and many others.
+
+**Setup:** Configure the MCP server once (instructions below). No prompt files needed!
 
 **How it works:**
 1. Run commands with `ai` wrapper: `ai npm test`
-2. AI reads logs with: `ai --last` command
+2. The MCP server **automatically guides** AI assistants to use the `ai` wrapper
+3. AI can read logs instantly with MCP tools (no manual commands needed)
+4. Watch live with: `ai live` in another terminal
+
+**Why it's better:**
+- ✅ **No prompt files needed** - MCP server provides guidance automatically
+- ✅ **Faster** - Direct tool calls instead of CLI commands
+- ✅ **Auto-fix** - AI scans and analyzes all errors automatically
+- ✅ **Self-documenting** - AI can call `get_usage_instructions` tool when confused
+
+**Four MCP Tools Available:**
+1. `view_logs` - View all recent terminal output
+2. `get_crash_context` - View only errors and crashes
+3. `auto_fix_errors` - Automatically detect and analyze all errors
+4. `get_usage_instructions` - Get comprehensive usage instructions
+
+### CLI Mode (Alternative Option)
+
+**Best for:** AI tools that don't support MCP yet (like Aider, Continue, or older versions of AI coding assistants).
+
+**Setup:** Requires creating a prompt file with instructions (see below).
+
+**How it works:**
+1. Run commands with `ai` wrapper: `ai npm test`
+2. AI manually runs: `ai --last` command to read logs
 3. Watch live with: `ai live` in another terminal
 
 **To enable auto-wrapping:**
@@ -105,11 +131,11 @@ When debugging, run `ai --last 200` to see recent output.
 
 Ask your AI to run commands and it will automatically use the wrapper.
 
-### MCP Mode
+---
 
-Faster alternative using MCP protocol. Works with any AI tool that supports MCP servers.
+## MCP Mode Setup
 
-#### Claude Desktop Setup
+### Claude Desktop Setup
 
 Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
@@ -126,7 +152,9 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
 Restart Claude Desktop.
 
-#### Cursor Setup
+**That's it!** No prompt files needed. The MCP server automatically guides Claude to use the `ai` wrapper.
+
+### Cursor Setup
 
 Open Cursor Settings > Features > Model Context Protocol
 
@@ -143,7 +171,9 @@ Add new MCP server:
 
 Restart Cursor.
 
-#### Windsurf Setup
+**That's it!** No prompt files needed. The MCP server automatically guides Cursor to use the `ai` wrapper.
+
+### Windsurf Setup
 
 Open Windsurf Settings and navigate to MCP configuration
 
@@ -160,61 +190,75 @@ Add new MCP server:
 
 Restart Windsurf.
 
-#### Using MCP Mode
+**That's it!** No prompt files needed. The MCP server automatically guides Windsurf to use the `ai` wrapper.
 
-Create `.prompts/ai-wrapper.md` in your project (see above).
+### Using MCP Mode
 
-**Now you can ask:**
-- "What's in the logs?" - AI calls `view_logs`
-- "Auto fix this" - AI calls `auto_fix_errors`
-- "What caused the crash?" - AI calls `get_crash_context`
+**Just ask naturally:**
+- "Run the tests" - AI will use `ai npm test` automatically
+- "What's in the logs?" - AI calls `view_logs` tool
+- "Auto fix this" - AI calls `auto_fix_errors` tool
+- "What caused the crash?" - AI calls `get_crash_context` tool
 
-**The difference:**
-- CLI mode: AI runs `ai --last` command manually
-- MCP mode: AI calls tools directly (faster, more powerful)
+The MCP server provides automatic guidance through tool descriptions. If the AI is confused, it can call the `get_usage_instructions` tool for comprehensive help.
 
 ---
 
-## CLI Mode vs MCP Mode
+## MCP Mode vs CLI Mode
 
-### CLI Mode
+### 🎯 MCP Mode (Recommended)
+
+**Configuration:**
+- ✅ **Zero prompt files required**
+- Configure MCP server once in your AI tool
+- MCP server automatically guides AI assistants
 
 **How it works:**
-1. You configure the AI to wrap commands with `ai`
+1. You configure your AI tool to load MCP server
+2. MCP server provides automatic guidance through tool descriptions
+3. AI calls tools directly: `view_logs`, `auto_fix_errors`, `get_crash_context`, `get_usage_instructions`
+4. No manual `ai --last` commands needed
+
+**Advantages:**
+- ✅ **No prompt files needed** - self-documenting
+- ✅ Faster - tools called directly, no CLI overhead
+- ✅ Auto-fix - AI scans and analyzes all errors automatically
+- ✅ Better for live conversation - AI can check logs naturally
+- ✅ Four powerful tools instead of one CLI command
+
+**Works with:**
+- Any AI tool that supports MCP (Model Context Protocol)
+- Claude Desktop, Claude Code, Cursor, Windsurf, and many others
+
+### CLI Mode (Alternative)
+
+**Configuration:**
+- ⚙️ **Requires creating prompt files** (`.prompts/ai-wrapper.md`, `.cursorrules`, etc.)
+- Must manually configure AI to use `ai` wrapper
+- Different file per AI tool
+
+**How it works:**
+1. You create prompt file telling AI to wrap commands with `ai`
 2. AI runs `ai --last` to read logs
 3. Everything works through terminal commands
 
 **Advantages:**
-- No MCP setup required
 - Works with any AI tool that has terminal access
+- No MCP setup required
 - Uses fewer tokens
 
 **Disadvantages:**
+- ⚙️ **Manual setup required** - must create prompt files
 - Slower - AI must manually run `ai --last` command
 - More verbose - requires explicit CLI commands
 - No auto-fix tool
-
-### MCP Mode
-
-**How it works:**
-1. You configure your AI tool to load MCP server
-2. AI calls tools directly: `view_logs`, `auto_fix_errors`, `get_crash_context`
-3. No manual `ai --last` commands needed
-
-**Advantages:**
-- Faster - tools called directly, no CLI overhead
-- Auto-fix - AI scans and analyzes all errors automatically
-- Better for live conversation - AI can check logs naturally
-
-**Disadvantages:**
-- Requires MCP server configuration
-- Uses more tokens than CLI mode
+- No usage instructions tool
 
 ---
 
-## The Three MCP Tools
+## The Four MCP Tools
 
-When using MCP mode, Claude gets three powerful tools:
+When using MCP mode, AI assistants get four powerful tools:
 
 ### `view_logs`
 
@@ -283,6 +327,22 @@ Would you like me to apply these fixes?
 
 No scrolling. No copy-pasting. AI finds and analyzes everything.
 
+### `get_usage_instructions`
+
+Get comprehensive instructions on using ai-live-terminal-bridge.
+
+**You ask:** "How do I use this tool?" or AI calls it automatically when confused
+
+**Claude calls:** `get_usage_instructions()`
+
+**Claude sees:** Complete guide including:
+- Critical requirement to use `ai` wrapper for all commands
+- Examples of correct vs incorrect usage
+- When to use each MCP tool
+- Why the `ai` wrapper matters
+
+**Use for:** Onboarding, troubleshooting, understanding the system.
+
 ---
 
 ## How It Works
@@ -321,80 +381,47 @@ AI reads via:
 
 ## Configuration by AI Tool
 
-### Claude Code (VSCode Extension)
+### Claude Code (VSCode Extension) - MCP Supported
 
-**Step 1:** Create `.prompts/ai-wrapper.md`:
+**Use MCP Mode**
 
-```markdown
-# Terminal Command Rules
+Claude Code supports MCP servers natively. The MCP server will automatically guide Claude to use the `ai` wrapper.
 
-Always run terminal commands using the `ai` wrapper.
+**Setup:**
+1. Configure the MCP server (see MCP Mode Setup section above)
+2. That's it! No prompt files needed!
 
-Format: ai <command>
+The MCP server provides automatic guidance, so you don't need `.prompts/ai-wrapper.md` or any other configuration files.
 
-Examples:
-- ai npm test
-- ai npm start
-- ai python script.py
+### Cursor - MCP Supported
 
-When debugging, run `ai --last 200` to see recent output.
-```
+**Use MCP Mode**
 
-**Step 2 (Optional):** Copy `.prompts/settings.local.json` from this repo to auto-approve commands.
+Cursor supports MCP servers natively. The MCP server will automatically guide Cursor to use the `ai` wrapper.
 
-Warning: Only use in trusted projects.
+**Setup:**
+1. Configure the MCP server (see MCP Mode Setup section above)
+2. That's it! No prompt files needed!
 
-**Step 3:** Ask Claude to run commands. It will automatically use `ai` wrapper.
+The MCP server provides automatic guidance, so you don't need `.cursorrules` or any other configuration files.
 
-**Step 4:** Ask Claude to check logs: "Check the logs with ai --last"
+### Windsurf - MCP Supported
 
-### Cursor
+**Use MCP Mode**
 
-**Step 1:** Create `.cursorrules`:
+Windsurf supports MCP servers natively. The MCP server will automatically guide Windsurf to use the `ai` wrapper.
 
-```markdown
-# Terminal Command Rules
+**Setup:**
+1. Configure the MCP server (see MCP Mode Setup section above)
+2. That's it! No prompt files needed!
 
-Always run terminal commands using the `ai` wrapper.
-
-Format: ai <command>
-
-Examples:
-- ai npm test
-- ai npm start
-- ai python script.py
-
-When debugging, run `ai --last 200` to see recent output.
-```
-
-**Step 2:** Ask Cursor to run commands. It will automatically use `ai` wrapper.
-
-**Step 3:** Ask Cursor to check logs: "Run ai --last and show me what happened"
-
-### Windsurf
-
-**Step 1:** Create `.windsurfrules`:
-
-```markdown
-# Terminal Command Rules
-
-Always run terminal commands using the `ai` wrapper.
-
-Format: ai <command>
-
-Examples:
-- ai npm test
-- ai npm start
-- ai python script.py
-
-When debugging, run `ai --last 200` to see recent output.
-```
-
-**Step 2:** Ask Windsurf to run commands.
-
-**Step 3:** Ask Windsurf to check logs: "Check ai --last to see what happened"
+The MCP server provides automatic guidance, so you don't need `.windsurfrules` or any other configuration files.
 
 ### Claude Desktop (macOS/Windows)
+
+**Use MCP Mode**
+
+Claude Desktop uses MCP natively for full functionality.
 
 **Step 1:** Edit `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
@@ -413,11 +440,13 @@ When debugging, run `ai --last 200` to see recent output.
 
 **Step 3:** Verify: Ask Claude "What MCP tools do you have?"
 
-You should see `view_logs`, `get_crash_context`, and `auto_fix_errors`.
+You should see `view_logs`, `get_crash_context`, `auto_fix_errors`, and `get_usage_instructions`.
 
-**Step 4:** Run commands with `ai` and ask Claude to check logs or auto-fix errors.
+**That's it!** No prompt files needed. Claude will automatically use the `ai` wrapper when running commands.
 
-### Cline (VSCode Extension)
+### Cline (VSCode Extension) - CLI Mode Only
+
+Cline doesn't support MCP yet. Use CLI mode.
 
 **Step 1:** Create `.prompts/ai-wrapper.md`:
 
@@ -440,7 +469,9 @@ When debugging, run `ai --last 200` to see recent output.
 
 **Step 3:** Ask Cline: "Run ai --last 100 to see the output"
 
-### Continue (VSCode Extension)
+### Continue (VSCode Extension) - CLI Mode Only
+
+Continue doesn't support MCP yet. Use CLI mode.
 
 **Step 1:** Create `.continuerules` or add to Continue config:
 
@@ -463,7 +494,9 @@ When debugging, run `ai --last 200` to see recent output.
 
 **Step 3:** Ask Continue: "Check the logs with ai --last"
 
-### Aider
+### Aider - CLI Mode Only
+
+Aider doesn't support MCP yet. Use CLI mode.
 
 **Step 1:** Create `.aider.conf.yml`:
 
@@ -677,7 +710,9 @@ Yes. `ai docker-compose up`, `ai docker run`, etc. all work.
 
 ### Can AI assistants other than Claude use this?
 
-Yes. Any AI with terminal access can run `ai --last` to read logs. MCP tools currently only work with Claude Desktop.
+Yes! Both modes work with any AI:
+- **MCP Mode:** Works with any AI tool that supports the Model Context Protocol (Claude Desktop, Claude Code, Cursor, Windsurf, etc.)
+- **CLI Mode:** Works with any AI that has terminal access (Aider, Continue, ChatGPT with code interpreter, etc.)
 
 ### What about CI/CD?
 

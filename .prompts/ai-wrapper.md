@@ -1,5 +1,9 @@
 # Command Execution Protocol
 
+⚠️ **Note:** This file is only needed for **CLI Mode**. If you're using **MCP Mode** (Claude Desktop, Claude Code with MCP, Cursor, or Windsurf), you don't need this file! The MCP server provides automatic guidance.
+
+---
+
 ## Mandatory Rule
 
 Prefix every Bash tool invocation with `ai` followed by the actual command.
