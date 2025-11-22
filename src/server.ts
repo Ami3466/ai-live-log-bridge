@@ -7,8 +7,8 @@ import {
   ListToolsRequestSchema,
   Tool,
 } from '@modelcontextprotocol/sdk/types.js';
-import { readFileSync, existsSync } from 'fs';
-import { LOG_FILE } from './storage.js';
+import { existsSync } from 'fs';
+import { LOG_FILE, readRecentLogs, getSessionLogFiles } from './storage.js';
 
 /**
  * MCP Server Mode
@@ -30,8 +30,21 @@ export async function startMCPServer(): Promise<void> {
   // Define the tools
   const tools: Tool[] = [
     {
+      name: 'view_logs',
+      description: 'View recent terminal session logs. Use this anytime the user wants to see what commands were run and their output, check on progress, or understand what happened. Works with or without errors. Perfect for casual log viewing.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          lines: {
+            type: 'number',
+            description: 'Number of recent lines to read (default: 100)',
+          },
+        },
+      },
+    },
+    {
       name: 'get_crash_context',
-      description: 'Read the session log file to get crash context and recent command output',
+      description: 'Read the session log file specifically to get crash context and debug errors. Use this when investigating crashes, failures, or when the user asks about errors. For general log viewing, use view_logs instead.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -67,10 +80,13 @@ export async function startMCPServer(): Promise<void> {
     const { name, arguments: args } = request.params;
 
     try {
-      if (name === 'get_crash_context') {
+      if (name === 'view_logs') {
         const lines = (args?.lines as number) || 100;
 
-        if (!existsSync(LOG_FILE)) {
+        const sessionFiles = getSessionLogFiles();
+
+        // Check if we have any logs (session files or legacy file)
+        if (sessionFiles.length === 0 && !existsSync(LOG_FILE)) {
           return {
             content: [
               {
@@ -81,9 +97,8 @@ export async function startMCPServer(): Promise<void> {
           };
         }
 
-        const content = readFileSync(LOG_FILE, 'utf-8');
-        const allLines = content.split('\n');
-        const recentLines = allLines.slice(-lines).join('\n');
+        // Use the new readRecentLogs function to read from session files
+        const recentLines = readRecentLogs(lines);
 
         return {
           content: [
@@ -95,10 +110,13 @@ export async function startMCPServer(): Promise<void> {
         };
       }
 
-      if (name === 'auto_fix_errors') {
-        const lines = (args?.lines as number) || 200;
+      if (name === 'get_crash_context') {
+        const lines = (args?.lines as number) || 100;
 
-        if (!existsSync(LOG_FILE)) {
+        const sessionFiles = getSessionLogFiles();
+
+        // Check if we have any logs (session files or legacy file)
+        if (sessionFiles.length === 0 && !existsSync(LOG_FILE)) {
           return {
             content: [
               {
@@ -109,9 +127,76 @@ export async function startMCPServer(): Promise<void> {
           };
         }
 
-        const content = readFileSync(LOG_FILE, 'utf-8');
-        const allLines = content.split('\n');
-        const recentLines = allLines.slice(-lines);
+        // Use the new readRecentLogs function to read from session files
+        const content = readRecentLogs(lines);
+        const recentLines = content.split('\n');
+
+        // Error detection patterns (same as auto_fix_errors)
+        const errorPatterns = [
+          /\berror:/i,
+          /\bError\b/,
+          /\bexception:/i,
+          /\bException\b/,
+          /\bfailed\b/i,
+          /\bTypeError\b/,
+          /\bSyntaxError\b/,
+          /\bReferenceError\b/,
+          /Process exited with code: [^0]/,
+          /^\s+at\s+/,  // Stack trace lines
+        ];
+
+        // Filter to only error-related lines
+        const errorLines: string[] = [];
+        recentLines.forEach((line: string) => {
+          for (const pattern of errorPatterns) {
+            if (pattern.test(line)) {
+              errorLines.push(line);
+              break;
+            }
+          }
+        });
+
+        if (errorLines.length === 0) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: '✅ No errors or crashes detected in the recent logs.\n\nThe session log looks clean! If you want to see all logs (not just errors), use the view_logs tool instead.',
+              },
+            ],
+          };
+        }
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `# Crash Context (Errors Only)\n\nFound ${errorLines.length} error-related line(s):\n\n\`\`\`\n${errorLines.join('\n')}\n\`\`\`\n\nFor full logs including non-error output, use the view_logs tool.`,
+            },
+          ],
+        };
+      }
+
+      if (name === 'auto_fix_errors') {
+        const lines = (args?.lines as number) || 200;
+
+        const sessionFiles = getSessionLogFiles();
+
+        // Check if we have any logs (session files or legacy file)
+        if (sessionFiles.length === 0 && !existsSync(LOG_FILE)) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: 'No log file found. Run a command with `ai` first.',
+              },
+            ],
+          };
+        }
+
+        // Use the new readRecentLogs function to read from session files
+        const content = readRecentLogs(lines);
+        const recentLines = content.split('\n');
 
         // Error detection patterns
         const errorPatterns = [
@@ -129,7 +214,7 @@ export async function startMCPServer(): Promise<void> {
 
         // Find all error lines
         const errors: Array<{ line: string; index: number; type: string }> = [];
-        recentLines.forEach((line, index) => {
+        recentLines.forEach((line: string, index: number) => {
           for (const pattern of errorPatterns) {
             if (pattern.test(line)) {
               let errorType = 'Unknown Error';

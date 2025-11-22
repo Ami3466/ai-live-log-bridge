@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 
 import chalk from 'chalk';
-import { readFileSync, existsSync } from 'fs';
-import { LOG_FILE } from '../storage.js';
+import { existsSync } from 'fs';
+import { LOG_FILE, readRecentLogs, getSessionLogFiles } from '../storage.js';
 import { startMCPServer } from '../server.js';
 import { runCommandWrapper } from '../wrapper.js';
+import { getMasterIndexPath } from '../session.js';
 
 async function main() {
   const args = process.argv.slice(2);
@@ -18,30 +19,70 @@ async function main() {
   }
 
   // Mode B: Live Log Viewer (ai live)
-  // Watch logs in real-time
+  // Watch logs in real-time from session files
   if (args[0] === 'live' || args.includes('--live') || args.includes('--watch')) {
     console.log(chalk.cyan('👀 Watching logs in real-time...'));
-    console.log(chalk.gray(`📁 Log file: ${LOG_FILE}`));
+    console.log(chalk.gray(`📁 Session logs directory: ~/.mcp-logs/`));
     console.log(chalk.gray('Press Ctrl+C to exit\n'));
     console.log(chalk.dim('='.repeat(80)) + '\n');
 
-    if (!existsSync(LOG_FILE)) {
-      console.log(chalk.yellow('No log file found yet. Waiting for commands...\n'));
+    // Show recent logs first
+    const recentLogs = readRecentLogs(20);
+    if (recentLogs) {
+      console.log(recentLogs);
+      console.log('\n' + chalk.dim('='.repeat(80)) + '\n');
+      console.log(chalk.cyan('📡 Watching for new sessions...\n'));
+    } else {
+      console.log(chalk.yellow('No log files found yet. Waiting for commands...\n'));
     }
+
+    // Watch the master index file to detect new sessions
+    const masterIndex = getMasterIndexPath();
 
     // Dynamic import for tail functionality
     const { spawn } = await import('child_process');
-    const tail = spawn('tail', ['-f', '-n', '20', LOG_FILE], {
+
+    // Watch master index with tail -f to detect new sessions
+    const tail = spawn('tail', ['-f', '-n', '0', masterIndex], {
       stdio: ['ignore', 'pipe', 'inherit']
     });
 
     tail.stdout?.on('data', (data) => {
-      process.stdout.write(data.toString());
+      const output = data.toString();
+      // Extract session ID from master index line and show the full session output
+      const sessionIdMatch = output.match(/\[([\d-]+)\]/);
+      if (sessionIdMatch) {
+        const sessionId = sessionIdMatch[1];
+        console.log(chalk.cyan(`\n━━━ New Session: ${sessionId} ━━━`));
+        console.log(output);
+
+        // Also tail the actual session file
+        const sessionFiles = getSessionLogFiles(1); // Get the most recent session
+        if (sessionFiles.length > 0) {
+          const sessionTail = spawn('tail', ['-f', '-n', '+1', sessionFiles[0]], {
+            stdio: ['ignore', 'pipe', 'inherit']
+          });
+
+          sessionTail.stdout?.on('data', (sessionData) => {
+            process.stdout.write(sessionData.toString());
+          });
+
+          // Store tail process for cleanup
+          process.on('SIGINT', () => {
+            sessionTail.kill();
+          });
+        }
+      }
     });
 
     tail.on('error', (error) => {
-      console.error(chalk.red('Error watching logs:'), error);
-      process.exit(1);
+      // If master index doesn't exist, create it and wait
+      if (!existsSync(masterIndex)) {
+        console.log(chalk.yellow('Waiting for first command to be executed...\n'));
+      } else {
+        console.error(chalk.red('Error watching logs:'), error);
+        process.exit(1);
+      }
     });
 
     // Handle graceful shutdown
@@ -55,7 +96,7 @@ async function main() {
   }
 
   // Mode C: CLI Reader (ai --last)
-  // Used by Claude Code / Cursor Agent
+  // Used by Claude Code / Cursor Agent - reads from session files
   if (args.includes('--last')) {
     const lastIndex = args.indexOf('--last');
     const linesArg = args[lastIndex + 1];
@@ -71,20 +112,27 @@ async function main() {
       lines = 10000;
     }
 
-    if (!existsSync(LOG_FILE)) {
+    const sessionFiles = getSessionLogFiles();
+
+    // Check for any logs (session files or legacy file)
+    if (sessionFiles.length === 0 && !existsSync(LOG_FILE)) {
       console.log(chalk.yellow('No log file found. Run a command with `ai` first.'));
       process.exit(0);
     }
 
     try {
-      const content = readFileSync(LOG_FILE, 'utf-8');
-      const allLines = content.split('\n');
-      const recentLines = allLines.slice(-lines);
+      // Use the new readRecentLogs function to read from session files
+      const recentLogs = readRecentLogs(lines);
 
-      console.log(recentLines.join('\n'));
+      if (recentLogs) {
+        console.log(recentLogs);
+      } else {
+        console.log(chalk.yellow('No logs available.'));
+      }
+
       process.exit(0);
     } catch (error) {
-      console.error(chalk.red('Error reading log file:'), error);
+      console.error(chalk.red('Error reading log files:'), error);
       process.exit(1);
     }
   }

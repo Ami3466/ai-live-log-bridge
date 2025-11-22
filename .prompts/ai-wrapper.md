@@ -26,10 +26,31 @@ ai <command> <arguments>
 ## Rationale
 
 The `ai` wrapper enables:
-- Command output logging to `~/.mcp-logs/session.log`
+- **Session Isolation**: Each command gets a unique session ID and log file
+- **Secret Redaction**: API keys, passwords, and tokens automatically redacted from logs
+- Command output logging to `~/.mcp-logs/session-{ID}.log`
+- Master index tracking all sessions in `~/.mcp-logs/master-index.log`
 - Real-time monitoring via `ai live` in user's terminal
 - Complete visibility into command execution
 - Prevention of hidden process conflicts
+
+## Security Features (New!)
+
+The `ai` wrapper now provides automatic secret redaction and session isolation:
+
+### Secret Redaction
+- **Automatic Protection**: API keys, passwords, and tokens are automatically redacted from logs
+- **Terminal Privacy**: Your terminal shows real output (no redaction)
+- **Log Security**: Log files contain `[REDACTED]` placeholders
+- **AI Safety**: Protects credentials from being sent to LLMs
+- **15+ Patterns**: Covers AWS keys, GitHub tokens, Stripe keys, OpenAI keys, database URLs, JWT tokens, and more
+
+### Session Isolation
+- **Unique Sessions**: Each command gets a unique session ID (format: `YYYYMMDDHHmmss-XXXX`)
+- **Separate Logs**: Each command writes to `~/.mcp-logs/session-{ID}.log`
+- **No Interleaving**: Concurrent commands never mix outputs
+- **Master Index**: All sessions tracked in `~/.mcp-logs/master-index.log`
+- **Perfect for AI**: Clean, parseable logs with accurate stack traces
 
 ## Reading Command Output
 

@@ -2,23 +2,37 @@ import spawn from 'cross-spawn';
 import { createWriteStream } from 'fs';
 import stripAnsi from 'strip-ansi';
 import chalk from 'chalk';
-import { LOG_FILE, ensureStorageExists } from './storage.js';
+import { ensureStorageExists } from './storage.js';
+import { generateSessionId, getSessionLogPath, registerSession } from './session.js';
+import { redactSecrets } from './redact-secrets.js';
 
 /**
  * Wrapper Mode
  * Spawns a command, preserves colors, pipes to screen, strips ANSI, writes to log
+ * Now with session isolation and secret redaction
  */
 export async function runCommandWrapper(command: string, args: string[]): Promise<void> {
   // Ensure storage directory exists
   ensureStorageExists();
 
-  // Create log file stream (append mode)
-  const logStream = createWriteStream(LOG_FILE, { flags: 'a' });
+  // Generate unique session ID for this command execution
+  const sessionId = generateSessionId();
+  const logFilePath = getSessionLogPath(sessionId);
+
+  // Register this session in the master index
+  registerSession(sessionId, command, args);
+
+  // Create log file stream for this session
+  const logStream = createWriteStream(logFilePath, { flags: 'w' }); // 'w' = new file
 
   // Write header to log file
   const timestamp = new Date().toISOString();
-  const header = `\n${'='.repeat(80)}\n[${timestamp}] Command: ${command} ${args.join(' ')}\n${'='.repeat(80)}\n`;
+  const fullCommand = `${command} ${args.join(' ')}`;
+  const header = `${'='.repeat(80)}\n[${timestamp}] Session: ${sessionId}\n[${timestamp}] Command: ${fullCommand}\n${'='.repeat(80)}\n`;
   logStream.write(header);
+
+  // Show session ID to user
+  console.log(chalk.dim(`[Session: ${sessionId}]`));
 
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
@@ -41,12 +55,14 @@ export async function runCommandWrapper(command: string, args: string[]): Promis
     child.stdout?.on('data', (data: Buffer) => {
       const output = data.toString();
 
-      // Write to console with colors preserved
+      // Write to console with colors preserved (no redaction for user's view)
       process.stdout.write(output);
 
-      // Write to log file without ANSI color codes
+      // Write to log file: strip ANSI codes AND redact secrets
       if (!hasError) {
-        logStream.write(stripAnsi(output));
+        const cleanOutput = stripAnsi(output);
+        const redactedOutput = redactSecrets(cleanOutput);
+        logStream.write(redactedOutput);
       }
     });
 
@@ -54,12 +70,14 @@ export async function runCommandWrapper(command: string, args: string[]): Promis
     child.stderr?.on('data', (data: Buffer) => {
       const output = data.toString();
 
-      // Write to console with colors preserved
+      // Write to console with colors preserved (no redaction for user's view)
       process.stderr.write(output);
 
-      // Write to log file without ANSI color codes
+      // Write to log file: strip ANSI codes AND redact secrets
       if (!hasError) {
-        logStream.write(stripAnsi(output));
+        const cleanOutput = stripAnsi(output);
+        const redactedOutput = redactSecrets(cleanOutput);
+        logStream.write(redactedOutput);
       }
     });
 
