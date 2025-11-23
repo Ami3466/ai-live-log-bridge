@@ -1,6 +1,6 @@
 {
   "name": "ai-live-log-bridge",
-  "version": "1.3.5",
+  "version": "1.3.4",
   "description": "A bridge between AI assistants and your live logs. Monitors terminal output and browser console/network activity. Run commands with `ai` and your AI can read the logs automatically.",
   "main": "dist/bin/cli.js",
   "bin": {
