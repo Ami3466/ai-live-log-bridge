@@ -1,5 +1,4 @@
 import { createWriteStream, WriteStream } from 'fs';
-import { resolve, normalize } from 'path';
 import { z } from 'zod';
 import { redactSecrets } from '../redact-secrets.js';
 import { ensureBrowserStorageExists } from './browser-storage.js';
@@ -21,7 +20,7 @@ import {
 
 // Zod schema for validating incoming messages
 const BrowserMessageSchema = z.object({
-  type: z.enum(['console', 'network', 'error', 'performance', 'session-start', 'session-end']),
+  type: z.enum(['console', 'network', 'error', 'performance', 'session-start', 'session-end', 'heartbeat']),
   timestamp: z.number().optional(),
   url: z.string().max(2048).optional(), // Prevent extremely long URLs
   tabId: z.number().optional(),
@@ -72,49 +71,46 @@ export class NativeHost {
 
     /**
      * PROTOCOL NOTE:
-     * Chrome's Native Messaging protocol officially uses length-prefixed binary messages:
+     * Chrome's Native Messaging protocol uses length-prefixed binary messages:
      * - First 4 bytes: uint32 message length (little-endian)
      * - Following bytes: UTF-8 encoded JSON message
      *
-     * However, for development simplicity and compatibility with text-based extensions,
-     * this implementation currently uses line-delimited JSON (one JSON object per line).
-     *
-     * The Chrome extension must be configured to send messages in the same format:
-     * - Each message should be a complete JSON object
-     * - Messages should be separated by newline characters (\n)
-     * - No binary framing is expected
-     *
-     * To switch to proper Chrome Native Messaging protocol, both the extension and
-     * this host would need to be updated to handle binary length-prefixed messages.
-     *
      * See: https://developer.chrome.com/docs/extensions/develop/concepts/native-messaging
      */
-    let buffer = '';
+    let buffer = Buffer.alloc(0);
 
     process.stdin.on('data', (chunk: Buffer) => {
-      buffer += chunk.toString();
+      buffer = Buffer.concat([buffer, chunk]);
 
-      // Process complete lines (messages)
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || ''; // Keep incomplete line in buffer
+      // Process all complete messages in buffer
+      while (buffer.length >= 4) {
+        // Read message length (first 4 bytes, little-endian uint32)
+        const messageLength = buffer.readUInt32LE(0);
 
-      for (const line of lines) {
-        if (line.trim()) {
-          try {
-            const parsed = JSON.parse(line);
+        // Check if we have the complete message
+        if (buffer.length < 4 + messageLength) {
+          break; // Wait for more data
+        }
 
-            // Validate message structure with Zod
-            const validationResult = BrowserMessageSchema.safeParse(parsed);
+        // Extract the message
+        const messageBytes = buffer.slice(4, 4 + messageLength);
+        buffer = buffer.slice(4 + messageLength);
 
-            if (!validationResult.success) {
-              console.error('[Native Host] Invalid message format:', validationResult.error.flatten());
-              continue;
-            }
+        try {
+          const messageStr = messageBytes.toString('utf-8');
+          const parsed = JSON.parse(messageStr);
 
-            this.handleMessage(validationResult.data);
-          } catch (err) {
-            console.error('[Native Host] Failed to parse message:', err);
+          // Validate message structure with Zod
+          const validationResult = BrowserMessageSchema.safeParse(parsed);
+
+          if (!validationResult.success) {
+            console.error('[Native Host] Invalid message format:', validationResult.error.flatten());
+            continue;
           }
+
+          this.handleMessage(validationResult.data);
+        } catch (err) {
+          console.error('[Native Host] Failed to parse message:', err);
         }
       }
     });
@@ -131,32 +127,14 @@ export class NativeHost {
 
   /**
    * Validate and sanitize project directory path
+   * For browser monitoring, we always use the native host's working directory
+   * This ensures browser logs are grouped with the project they belong to
    */
-  private validateProjectDir(projectDir: string | undefined): string {
-    const cwd = process.cwd();
-
-    if (!projectDir) {
-      return cwd;
-    }
-
-    // Normalize and resolve the path to prevent traversal
-    const normalizedPath = normalize(projectDir);
-    const resolvedPath = resolve(normalizedPath);
-
-    // Security check: prevent path traversal
-    // Only allow absolute paths that don't contain suspicious patterns
-    if (normalizedPath.includes('..') || normalizedPath.includes('~')) {
-      console.error('[Native Host] Rejected suspicious project path:', projectDir);
-      return cwd;
-    }
-
-    // Additional validation: path must be absolute and reasonable
-    if (!resolvedPath.startsWith('/')) {
-      console.error('[Native Host] Rejected non-absolute path:', projectDir);
-      return cwd;
-    }
-
-    return resolvedPath;
+  private validateProjectDir(_projectDir: string | undefined): string {
+    // For browser sessions, always use the native host's cwd as the project identifier
+    // This matches how terminal sessions work and allows proper filtering by MCP
+    // The URL is still logged separately for reference
+    return process.cwd();
   }
 
   /**
@@ -171,6 +149,11 @@ export class NativeHost {
 
     if (message.type === 'session-end') {
       this.endSession();
+      return;
+    }
+
+    if (message.type === 'heartbeat') {
+      // Ignore heartbeat messages - they're just to keep the connection alive
       return;
     }
 
@@ -247,9 +230,6 @@ export class NativeHost {
       this.logStream.write(header);
 
       console.error(`[Native Host] Started session: ${this.sessionId}`);
-
-      // Send response back to extension (optional)
-      this.sendResponse({ success: true, sessionId: this.sessionId });
     } catch (err) {
       console.error('[Native Host] Failed to start session:', err);
       this.sessionId = null;
@@ -402,19 +382,6 @@ export class NativeHost {
     this.logStream.write(logEntry);
   }
 
-  /**
-   * Send a response back to the Chrome extension (optional)
-   * Chrome native messaging uses length-prefixed messages
-   */
-  private sendResponse(response: any): void {
-    const message = JSON.stringify(response);
-    const length = Buffer.byteLength(message);
-    const lengthBuffer = Buffer.allocUnsafe(4);
-    lengthBuffer.writeUInt32LE(length, 0);
-
-    process.stdout.write(lengthBuffer);
-    process.stdout.write(message);
-  }
 }
 
 /**

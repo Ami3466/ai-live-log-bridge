@@ -16,14 +16,25 @@ const __dirname = dirname(__filename);
 const projectRoot = join(__dirname, '..');
 const wrapperPath = join(projectRoot, 'dist', 'browser', 'native-host');
 
-const wrapperContent = `#!/usr/bin/env node
+const wrapperContent = `#!/opt/homebrew/bin/node
 
 /**
  * Native Messaging Host Wrapper
  * This wrapper is executed by Chrome's native messaging system.
+ * It changes to the project directory before importing to ensure dependencies are found.
  */
 
-import { NativeHost } from './native-host.js';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Change to project root so node_modules can be found
+process.chdir(join(__dirname, '..', '..'));
+
+// Now import the actual host
+const { NativeHost } = await import('./native-host.js');
 
 const host = new NativeHost();
 host.start().catch(err => {
