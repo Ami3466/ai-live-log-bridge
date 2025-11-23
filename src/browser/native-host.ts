@@ -52,6 +52,13 @@ export class NativeHost {
   private sessionId: string | null = null;
   private logStream: WriteStream | null = null;
   private isStartingSession: boolean = false;
+  private messageQueue: BrowserMessage[] = [];
+  private processingQueue: boolean = false;
+
+  // Rate limiting
+  private messageCount: number = 0;
+  private rateLimitWindowStart: number = Date.now();
+  private readonly MAX_MESSAGES_PER_SECOND = 1000;
 
   /**
    * Start the native messaging host
@@ -126,6 +133,34 @@ export class NativeHost {
   }
 
   /**
+   * Validate and sanitize URL
+   * @param url The URL to validate
+   * @returns Validated URL or undefined if invalid
+   */
+  private validateUrl(url: string | undefined): string | undefined {
+    if (!url) {
+      return undefined;
+    }
+
+    try {
+      // Try to parse as URL to validate format
+      const parsed = new URL(url);
+
+      // Only allow http/https protocols for security
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        console.error(`[Native Host] Invalid URL protocol: ${parsed.protocol}`);
+        return undefined;
+      }
+
+      // Return the validated URL (limit to 2048 chars as per schema)
+      return url.substring(0, 2048);
+    } catch (err) {
+      console.error(`[Native Host] Invalid URL format: ${url}`);
+      return undefined;
+    }
+  }
+
+  /**
    * Validate and sanitize project directory path
    * For browser monitoring, we always use the native host's working directory
    * This ensures browser logs are grouped with the project they belong to
@@ -138,17 +173,69 @@ export class NativeHost {
   }
 
   /**
+   * Check and enforce rate limiting
+   * @returns true if message should be processed, false if rate limit exceeded
+   */
+  private checkRateLimit(): boolean {
+    const now = Date.now();
+    const windowElapsed = now - this.rateLimitWindowStart;
+
+    // Reset counter every second
+    if (windowElapsed >= 1000) {
+      this.messageCount = 0;
+      this.rateLimitWindowStart = now;
+    }
+
+    this.messageCount++;
+
+    if (this.messageCount > this.MAX_MESSAGES_PER_SECOND) {
+      console.error(`[Native Host] Rate limit exceeded: ${this.messageCount} messages/sec`);
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Process queued messages
+   */
+  private async processMessageQueue(): Promise<void> {
+    if (this.processingQueue) {
+      return;
+    }
+
+    this.processingQueue = true;
+
+    while (this.messageQueue.length > 0) {
+      const message = this.messageQueue.shift();
+      if (message) {
+        await this.handleMessageInternal(message);
+      }
+    }
+
+    this.processingQueue = false;
+  }
+
+  /**
    * Handle a message from the Chrome extension
    */
-  private handleMessage(message: BrowserMessage): void {
+  private async handleMessage(message: BrowserMessage): Promise<void> {
+    // Rate limiting check
+    if (!this.checkRateLimit()) {
+      return;
+    }
+
     if (message.type === 'session-start') {
       const validatedDir = this.validateProjectDir(message.projectDir);
-      this.startSession(validatedDir, message.url);
+      const validatedUrl = this.validateUrl(message.url);
+      await this.startSession(validatedDir, validatedUrl);
+      // Process any queued messages after session starts
+      await this.processMessageQueue();
       return;
     }
 
     if (message.type === 'session-end') {
-      this.endSession();
+      await this.endSession();
       return;
     }
 
@@ -157,18 +244,27 @@ export class NativeHost {
       return;
     }
 
-    // Ensure session is started (prevent race condition with flag)
+    // If session is not ready, queue the message
     if (!this.sessionId || !this.logStream) {
       if (this.isStartingSession) {
-        // Session is already being started, skip this message
-        console.error('[Native Host] Session start in progress, skipping message');
+        // Session is starting, queue this message
+        this.messageQueue.push(message);
         return;
       }
       // Auto-start session if not already started
       const validatedDir = this.validateProjectDir(message.projectDir);
-      this.startSession(validatedDir, message.url);
+      const validatedUrl = this.validateUrl(message.url);
+      await this.startSession(validatedDir, validatedUrl);
     }
 
+    // Process the message
+    await this.handleMessageInternal(message);
+  }
+
+  /**
+   * Internal handler for processing a message
+   */
+  private async handleMessageInternal(message: BrowserMessage): Promise<void> {
     // Route message to appropriate handler
     switch (message.type) {
       case 'console':
@@ -191,7 +287,7 @@ export class NativeHost {
   /**
    * Start a new browser monitoring session
    */
-  private startSession(projectDir: string, url?: string): void {
+  private async startSession(projectDir: string, url?: string): Promise<void> {
     if (this.sessionId) {
       console.error('[Native Host] Session already started:', this.sessionId);
       return;
@@ -209,10 +305,10 @@ export class NativeHost {
       const logFilePath = getBrowserSessionLogPath(this.sessionId);
 
       // Register this session in the master index
-      registerBrowserSession(this.sessionId, projectDir, url);
+      await registerBrowserSession(this.sessionId, projectDir, url);
 
       // Mark this session as active
-      markBrowserSessionActive(this.sessionId, projectDir, url);
+      await markBrowserSessionActive(this.sessionId, projectDir, url);
 
       // Create log file stream
       this.logStream = createWriteStream(logFilePath, { flags: 'w' });
@@ -242,7 +338,7 @@ export class NativeHost {
   /**
    * End the current browser monitoring session
    */
-  private endSession(): void {
+  private async endSession(): Promise<void> {
     if (!this.sessionId && !this.logStream) {
       return;
     }
@@ -258,7 +354,7 @@ export class NativeHost {
       if (this.sessionId) {
         const keepDays = parseInt(process.env.AI_KEEP_LOGS || '1', 10);
         const archiveLog = keepDays > 0;
-        markBrowserSessionCompleted(this.sessionId, archiveLog);
+        await markBrowserSessionCompleted(this.sessionId, archiveLog);
         console.error(`[Native Host] Ended session: ${this.sessionId}`);
       }
     } catch (err) {
@@ -267,6 +363,8 @@ export class NativeHost {
       this.sessionId = null;
       this.logStream = null;
       this.isStartingSession = false;
+      // Clear any queued messages
+      this.messageQueue = [];
     }
   }
 

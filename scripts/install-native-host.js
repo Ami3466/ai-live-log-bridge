@@ -99,12 +99,11 @@ function install() {
 
   console.log('\n✅ Native Messaging Host installed successfully!\n');
   console.log('📋 Next steps:');
-  console.log('  1. Install the Chrome extension from ~/Desktop/ai-live-log-bridge-extension');
-  console.log('  2. Copy the extension ID from chrome://extensions');
-  console.log(`  3. Update the manifest file at: ${manifestPath}`);
-  console.log('     Replace YOUR_EXTENSION_ID with the actual extension ID\n');
-  console.log('💡 For automatic extension ID setup, load the extension first,');
-  console.log('   then run: npm run update-extension-id <EXTENSION_ID>\n');
+  console.log('  1. Download and unzip the Chrome extension (see README.md for download link)');
+  console.log('  2. Load the extension in Chrome (chrome://extensions → "Load unpacked")');
+  console.log('  3. Copy the extension ID from chrome://extensions');
+  console.log('  4. Run: npm run update-extension-id <EXTENSION_ID>');
+  console.log(`\n💡 The manifest file is located at: ${manifestPath}\n`);
 }
 
 // Run installation

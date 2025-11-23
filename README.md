@@ -107,33 +107,33 @@ ai python manage.py runserver
 
 ### Setup Browser Monitoring (Optional but Recommended)
 
-> **Coming Soon:** One-click installation from Chrome Web Store! Currently in review.
->
-> **For now:** Use the manual setup below (temporary until Chrome Web Store approval)
+> **Chrome Web Store:** Currently in review. Manual installation required until approved.
 
-**1. Install Native Host:**
+**1. Download Chrome Extension:**
+```bash
+npm run download-extension
+```
+
+**2. Install Native Host:**
 ```bash
 npm run install-native-host
 ```
 
-**2. Load Extension Manually:**
-```bash
-# Extension location: ~/Desktop/ai-live-log-bridge-extension
-# 1. Open chrome://extensions/
-# 2. Enable Developer mode
-# 3. Click "Load unpacked"
-# 4. Select ~/Desktop/ai-live-log-bridge-extension
-```
+**3. Load Extension in Chrome:**
+- Open `chrome://extensions/`
+- Enable **Developer mode** (top right)
+- Click **Load unpacked**
+- Select: `~/.ai-live-log-bridge-extension`
+- Copy the **Extension ID**
 
-**3. Update Extension ID:**
+**4. Configure Extension ID:**
 ```bash
-# Copy Extension ID from chrome://extensions/
 npm run update-extension-id <YOUR_EXTENSION_ID>
 ```
 
 **Done!** Now AI can see your terminal AND browser.
 
-**After Chrome Web Store approval:** Steps 2-3 will become a single "Install from Chrome Web Store" button.
+**After Chrome Web Store approval:** This becomes a one-click install from the Web Store.
 
 ---
 

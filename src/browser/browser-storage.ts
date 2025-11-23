@@ -188,9 +188,9 @@ export function readRecentBrowserLogs(totalLines: number, maxFiles: number = 10,
     const content = readFileSync(file, 'utf-8');
     const lines = content.split('\n').filter(line => line.trim().length > 0);
 
-    // Add session separator for clarity
+    // Add simple session separator
     const fileName = file.split('/').pop() || '';
-    const separator = `\n━━━ ${fileName} ━━━\n`;
+    const separator = `\n[Session: ${fileName.replace('.log', '')}]\n`;
 
     // For the most recent file, show all available lines up to the limit
     // For older files, show only what we need to reach totalLines

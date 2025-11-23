@@ -18,15 +18,30 @@ You might want to add custom domains for:
 
 ## How to Add Custom Domains
 
-### Step 1: Edit the Manifest
+### Step 1: Locate the Extension
 
-Open the extension manifest file:
+Find where your extension is installed:
 ```bash
-cd ~/Desktop/ai-live-log-bridge-extension
-code manifest.json  # Or use any text editor
+# If you used npm run download-extension:
+cd ~/.ai-live-log-bridge-extension
+
+# If you cloned the repo:
+cd /path/to/ai-live-log-bridge/extension
 ```
 
-### Step 2: Add Your Domains
+### Step 2: Edit the Manifest
+
+Open the manifest file:
+```bash
+# Use your preferred editor:
+code manifest.json
+# or
+nano manifest.json
+# or
+vim manifest.json
+```
+
+### Step 3: Add Your Domains
 
 Find the `host_permissions` and `content_scripts` sections and add your domain patterns:
 
@@ -77,13 +92,13 @@ Find the `host_permissions` and `content_scripts` sections and add your domain p
 
 **Important:** You must add domains to BOTH `host_permissions` AND `content_scripts.matches`!
 
-### Step 3: Reload the Extension
+### Step 4: Reload the Extension
 
 1. Open Chrome → `chrome://extensions/`
 2. Find "AI Live Log Bridge - Browser Monitor"
 3. Click the **Reload** button (↻ icon)
 
-### Step 4: Test It
+### Step 5: Test It
 
 1. Visit your custom domain (e.g., `https://staging.myapp.com`)
 2. Open DevTools (F12) → Console
@@ -302,7 +317,7 @@ These are generally safe:
 
 **1. Check manifest syntax:**
 ```bash
-cd ~/Desktop/ai-live-log-bridge-extension
+cd ~/.ai-live-log-bridge-extension  # or your extension location
 # Validate JSON
 python3 -m json.tool manifest.json
 ```

@@ -1,0 +1,55 @@
+{
+  "manifest_version": 3,
+  "name": "AI Live Terminal Bridge - Browser Monitor",
+  "version": "1.0.0",
+  "description": "Captures browser console logs and network activity for AI debugging. Monitors localhost and development tunnels only. Requires native host installation.",
+  "permissions": [
+    "nativeMessaging"
+  ],
+  "host_permissions": [
+    "http://localhost:*/*",
+    "http://127.0.0.1:*/*",
+    "https://*.ngrok.io/*",
+    "https://*.ngrok-free.app/*",
+    "https://*.loca.lt/*",
+    "https://*.trycloudflare.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["injected.js"],
+      "matches": [
+        "http://localhost:*/*",
+        "http://127.0.0.1:*/*",
+        "https://*.ngrok.io/*",
+        "https://*.ngrok-free.app/*",
+        "https://*.loca.lt/*",
+        "https://*.trycloudflare.com/*"
+      ]
+    }
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "http://localhost:*/*",
+        "http://127.0.0.1:*/*",
+        "https://*.ngrok.io/*",
+        "https://*.ngrok-free.app/*",
+        "https://*.loca.lt/*",
+        "https://*.trycloudflare.com/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_start",
+      "all_frames": false
+    }
+  ],
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
+  "homepage_url": "https://github.com/Ami3466/ai-live-log-bridge",
+  "privacy_policy": "https://github.com/Ami3466/ai-live-log-bridge/blob/main/extension/PRIVACY_POLICY.md"
+}

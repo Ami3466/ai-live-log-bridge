@@ -162,10 +162,20 @@ if (!manifestPath) {
 }
 
 // Check 3: Chrome extension directory
-console.log('\n3. Checking Chrome extension directory...');
-const extensionDir = join(homedir(), 'Desktop', 'ai-live-log-bridge-extension');
-if (existsSync(extensionDir)) {
-  success('Extension directory found');
+console.log('\n3. Checking Chrome extension (optional)...');
+// Extension location is user-specific - check common locations
+const possibleExtensionPaths = [
+  join(homedir(), '.ai-live-log-bridge-extension'),
+  join(projectRoot, 'extension'),
+  join(homedir(), 'ai-live-log-bridge-extension'),
+  join(homedir(), 'Desktop', 'ai-live-log-bridge-extension'),
+  join(homedir(), 'Downloads', 'ai-live-log-bridge-extension'),
+];
+
+const extensionDir = possibleExtensionPaths.find(p => existsSync(p));
+
+if (extensionDir) {
+  success(`Extension directory found at: ${extensionDir}`);
 
   // Check for manifest.json
   const extManifestPath = join(extensionDir, 'manifest.json');
@@ -190,9 +200,10 @@ if (existsSync(extensionDir)) {
     hasErrors = true;
   }
 } else {
-  warning(`Extension directory not found at: ${extensionDir}`);
-  info('Make sure the extension is available (it may be in a different location)');
-  hasWarnings = true;
+  warning('Extension directory not found in common locations');
+  info('To download: npm run download-extension');
+  info('Or manually download from: https://github.com/Ami3466/ai-live-log-bridge/releases/latest');
+  info('The extension can be placed anywhere - this check is optional');
 }
 
 // Check 4: Browser logs directory

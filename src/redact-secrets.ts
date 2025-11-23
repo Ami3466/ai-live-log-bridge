@@ -3,8 +3,11 @@
  * Filters sensitive information from command output before logging
  */
 
+// Type for replacement functions
+type ReplacementFunction = (match: string, ...args: any[]) => string;
+
 // Common secret patterns to redact
-const SECRET_PATTERNS = [
+const SECRET_PATTERNS: Array<{ pattern: RegExp; replacement: string | ReplacementFunction }> = [
   // API Keys and tokens (generic)
   {
     pattern: /\b([a-zA-Z0-9_-]*(?:api[_-]?key|token|secret|password|passwd|pwd)[a-zA-Z0-9_-]*)\s*[=:]\s*['"]?([a-zA-Z0-9_\-./+=]{16,})['"]?/gi,
@@ -182,7 +185,11 @@ export function redactSecrets(text: string): string {
   let redacted = text;
 
   for (const { pattern, replacement } of SECRET_PATTERNS) {
-    redacted = redacted.replace(pattern, replacement as any);
+    if (typeof replacement === 'string') {
+      redacted = redacted.replace(pattern, replacement);
+    } else {
+      redacted = redacted.replace(pattern, replacement);
+    }
   }
 
   return redacted;

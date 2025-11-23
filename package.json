@@ -13,6 +13,7 @@
     "prepare": "npm run build",
     "start": "node dist/index.js",
     "dev": "tsc && node dist/index.js",
+    "download-extension": "bash scripts/download-extension.sh",
     "install-native-host": "node scripts/install-native-host.js",
     "update-extension-id": "node scripts/update-extension-id.js",
     "verify-browser-setup": "node scripts/verify-setup.js"

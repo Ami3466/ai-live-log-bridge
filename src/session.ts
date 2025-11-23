@@ -61,6 +61,24 @@ export function registerSession(sessionId: string, command: string, args: string
 }
 
 /**
+ * Validate session ID format
+ * @param sessionId The session ID to validate
+ * @returns true if valid, false otherwise
+ */
+function isValidSessionId(sessionId: string): boolean {
+  // Session ID format: YYYYMMDDHHmmss-xxxx (timestamp + 4 hex chars)
+  // Example: 20250122143022-a3f2
+  const validPattern = /^\d{14}-[a-f0-9]{4}$/;
+
+  // Additional length check to prevent extremely long inputs
+  if (sessionId.length > 100) {
+    return false;
+  }
+
+  return validPattern.test(sessionId);
+}
+
+/**
  * Get all session IDs from the master index
  * @returns Array of session IDs in chronological order
  */
@@ -74,14 +92,26 @@ export function getAllSessionIds(): string[] {
   const content = readFileSync(masterPath, 'utf-8');
   const lines = content.trim().split('\n').filter(line => line.length > 0);
 
-  // Extract session IDs using regex
+  // Extract session IDs using regex with validation
   const sessionIds: string[] = [];
   const sessionIdPattern = /\[([\d-]+)\]/;
 
   for (const line of lines) {
+    // Skip extremely long lines to prevent DoS
+    if (line.length > 10000) {
+      console.error('[Session] Skipping malformed line (too long)');
+      continue;
+    }
+
     const match = line.match(sessionIdPattern);
     if (match) {
-      sessionIds.push(match[1]);
+      const sessionId = match[1];
+      // Validate session ID format before adding
+      if (isValidSessionId(sessionId)) {
+        sessionIds.push(sessionId);
+      } else {
+        console.error(`[Session] Invalid session ID format: ${sessionId}`);
+      }
     }
   }
 

@@ -118,24 +118,31 @@ ai go run main.go
 
 This lets your AI see browser console logs and network requests from localhost.
 
-### Step 1: Install Native Host
+### Step 1: Download the Chrome Extension
 
 ```bash
-cd ~/Desktop/ai-live-log-bridge
+npm run download-extension
+```
+
+This downloads the extension to `~/.ai-live-log-bridge-extension`
+
+### Step 2: Install Native Host
+
+```bash
 npm run install-native-host
 ```
 
-### Step 2: Load Chrome Extension
+### Step 3: Load Chrome Extension
 
 1. Open Chrome → `chrome://extensions/`
 2. Enable **Developer mode** (top right toggle)
 3. Click **Load unpacked**
-4. Select folder: `~/Desktop/ai-live-log-bridge-extension`
+4. Select folder: `~/.ai-live-log-bridge-extension`
 5. **Copy the Extension ID** (32 characters under the extension name)
 
-### Step 3: Connect Extension to Native Host
+### Step 4: Connect Extension to Native Host
 
-Run this command with YOUR extension ID from step 2:
+Run this command with YOUR extension ID from step 3:
 
 ```bash
 npm run update-extension-id YOUR_EXTENSION_ID_HERE
@@ -146,7 +153,7 @@ Example:
 npm run update-extension-id abcdefghijklmnopqrstuvwxyz123456
 ```
 
-### Step 4: Test Browser Monitoring
+### Step 5: Test Browser Monitoring
 
 1. **Restart Chrome completely** (quit and reopen)
 2. Navigate to: `http://localhost:3000` (any localhost page)
@@ -256,10 +263,11 @@ npm test     # ❌ Not logged
 ### Browser: Extension shows "Disconnected"
 
 **Solutions:**
-1. Verify you ran: `npm run update-extension-id <ID>`
-2. Check the extension ID is correct
-3. **Restart Chrome completely** (quit and reopen)
-4. Refresh the localhost page
+1. Verify extension downloaded: `ls ~/.ai-live-log-bridge-extension/manifest.json`
+2. Verify you ran: `npm run update-extension-id <ID>`
+3. Check the extension ID is correct
+4. **Restart Chrome completely** (quit and reopen)
+5. Refresh the localhost page
 
 ### Browser: No logs appearing
 
@@ -282,7 +290,8 @@ npm test     # ❌ Not logged
 2. Should point to: `dist/browser/native-host` (without .js)
 3. Verify wrapper exists and is executable:
    ```bash
-   ls -l ~/Desktop/ai-live-log-bridge/dist/browser/native-host
+   which ai
+   ls -l $(npm root -g)/ai-live-log-bridge/dist/browser/native-host
    ```
 4. Should show: `-rwx--x--x` (executable)
 5. Rebuild if needed: `npm run build`

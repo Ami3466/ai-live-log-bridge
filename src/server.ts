@@ -512,23 +512,30 @@ This is not optional - it's required for the system to work.`;
 
 📦 One-Time Setup
 
-Step 1: Install the Chrome Extension
+Step 1: Download the Chrome Extension
 
-The Chrome extension is located on your Desktop:
-
-\`\`\`bash
-cd ~/Desktop/ai-live-log-bridge-extension
-\`\`\`
+Download the extension from the releases page or clone the repository.
+The extension files need to be placed in a directory on your system.
 
 Step 2: Load Extension in Chrome
 
 1. Open Chrome and go to: \`chrome://extensions/\`
 2. Enable "Developer mode" (toggle in top right)
 3. Click "Load unpacked"
-4. Select the folder: \`~/Desktop/ai-live-log-bridge-extension\`
+4. Select the extension directory (wherever you extracted it)
 5. The extension should now appear in your extensions list
 
-Step 3: Verify Connection
+Step 3: Configure Native Messaging
+
+Run these commands in the ai-live-log-bridge project directory:
+\`\`\`bash
+npm run install-native-host
+npm run update-extension-id <YOUR_EXTENSION_ID>
+\`\`\`
+
+Get the extension ID from chrome://extensions (it's shown under the extension name).
+
+Step 4: Verify Connection
 
 1. Open Chrome DevTools (F12) on any localhost page
 2. Check the extension icon - it should show "Connected"

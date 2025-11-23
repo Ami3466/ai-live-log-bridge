@@ -1,5 +1,5 @@
 import { randomBytes } from 'crypto';
-import { writeFileSync, readFileSync, existsSync, unlinkSync, renameSync, mkdirSync } from 'fs';
+import { writeFileSync, readFileSync, existsSync, unlinkSync, renameSync, mkdirSync, statSync } from 'fs';
 import { join } from 'path';
 import { BROWSER_MCP_DIR, BROWSER_ACTIVE_DIR, BROWSER_INACTIVE_DIR } from './browser-storage.js';
 
@@ -9,7 +9,14 @@ import { BROWSER_MCP_DIR, BROWSER_ACTIVE_DIR, BROWSER_INACTIVE_DIR } from './bro
  */
 const activeLocks = new Set<string>();
 
-function acquireLock(lockName: string, timeoutMs: number = 5000): boolean {
+/**
+ * Sleep for a specified number of milliseconds (non-blocking)
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function acquireLock(lockName: string, timeoutMs: number = 5000): Promise<boolean> {
   const lockFile = join(BROWSER_MCP_DIR, `.${lockName}.lock`);
   const startTime = Date.now();
 
@@ -18,26 +25,26 @@ function acquireLock(lockName: string, timeoutMs: number = 5000): boolean {
     mkdirSync(BROWSER_MCP_DIR, { recursive: true });
   }
 
-  // Wait for lock to be available
+  // Wait for lock to be available (with non-blocking sleep)
   while (activeLocks.has(lockName) || existsSync(lockFile)) {
     if (Date.now() - startTime > timeoutMs) {
       // Lock timeout - clean up stale lock if it's too old
       try {
         if (existsSync(lockFile)) {
-          const stats = require('fs').statSync(lockFile);
+          const stats = statSync(lockFile);
           const fileAge = Date.now() - stats.mtimeMs;
           if (fileAge > 30000) { // 30 seconds
             unlinkSync(lockFile);
+            console.error(`[Browser Session] Cleaned up stale lock: ${lockName}`);
           }
         }
-      } catch {
-        // Ignore cleanup errors
+      } catch (err) {
+        console.error(`[Browser Session] Failed to clean up stale lock: ${err instanceof Error ? err.message : String(err)}`);
       }
       return false;
     }
-    // Busy wait with small delay
-    const now = Date.now();
-    while (Date.now() - now < 10) { /* spin */ }
+    // Non-blocking sleep instead of busy-wait
+    await sleep(10);
   }
 
   // Acquire lock
@@ -45,8 +52,9 @@ function acquireLock(lockName: string, timeoutMs: number = 5000): boolean {
   try {
     writeFileSync(lockFile, String(process.pid), 'utf-8');
     return true;
-  } catch {
+  } catch (err) {
     activeLocks.delete(lockName);
+    console.error(`[Browser Session] Failed to acquire lock ${lockName}: ${err instanceof Error ? err.message : String(err)}`);
     return false;
   }
 }
@@ -58,8 +66,8 @@ function releaseLock(lockName: string): void {
     if (existsSync(lockFile)) {
       unlinkSync(lockFile);
     }
-  } catch {
-    // Ignore cleanup errors
+  } catch (err) {
+    console.error(`[Browser Session] Failed to release lock ${lockName}: ${err instanceof Error ? err.message : String(err)}`);
   }
 }
 
@@ -104,7 +112,7 @@ export function getBrowserMasterIndexPath(): string {
  * @param projectDir The working directory where the browser monitoring was started
  * @param url The URL being monitored (optional)
  */
-export function registerBrowserSession(sessionId: string, projectDir: string, url?: string): void {
+export async function registerBrowserSession(sessionId: string, projectDir: string, url?: string): Promise<void> {
   const timestamp = new Date().toISOString();
   const urlPart = url ? ` [URL: ${url}]` : '';
   const entry = `[${timestamp}] [${sessionId}] [${projectDir}]${urlPart}\n`;
@@ -112,7 +120,7 @@ export function registerBrowserSession(sessionId: string, projectDir: string, ur
   const masterPath = getBrowserMasterIndexPath();
 
   // Acquire lock before modifying shared file
-  if (!acquireLock('master-index', 5000)) {
+  if (!(await acquireLock('master-index', 5000))) {
     console.error('[Browser Session] Failed to acquire lock for master index');
     return;
   }
@@ -172,11 +180,11 @@ export function getActiveBrowserSessionsPath(): string {
  * @param projectDir The project directory
  * @param url The URL being monitored (optional)
  */
-export function markBrowserSessionActive(sessionId: string, projectDir: string, url?: string): void {
+export async function markBrowserSessionActive(sessionId: string, projectDir: string, url?: string): Promise<void> {
   const activePath = getActiveBrowserSessionsPath();
 
   // Acquire lock before modifying shared file
-  if (!acquireLock('active-sessions', 5000)) {
+  if (!(await acquireLock('active-sessions', 5000))) {
     console.error('[Browser Session] Failed to acquire lock for active sessions');
     return;
   }
@@ -206,11 +214,11 @@ export function markBrowserSessionActive(sessionId: string, projectDir: string, 
  * @param sessionId The browser session ID
  * @param archiveLog Whether to archive the log file to inactive directory (default: true)
  */
-export function markBrowserSessionCompleted(sessionId: string, archiveLog: boolean = true): void {
+export async function markBrowserSessionCompleted(sessionId: string, archiveLog: boolean = true): Promise<void> {
   const activePath = getActiveBrowserSessionsPath();
 
   // Acquire lock before modifying shared file
-  if (!acquireLock('active-sessions', 5000)) {
+  if (!(await acquireLock('active-sessions', 5000))) {
     console.error('[Browser Session] Failed to acquire lock for active sessions');
     return;
   }
@@ -236,7 +244,7 @@ export function markBrowserSessionCompleted(sessionId: string, archiveLog: boole
       try {
         renameSync(activeLogPath, inactiveLogPath);
       } catch (err) {
-        console.error(`[Browser Session] Failed to archive log: ${err}`);
+        console.error(`[Browser Session] Failed to archive log: ${err instanceof Error ? err.message : String(err)}`);
       }
     }
   } else {
@@ -246,7 +254,7 @@ export function markBrowserSessionCompleted(sessionId: string, archiveLog: boole
       try {
         unlinkSync(activeLogPath);
       } catch (err) {
-        console.error(`[Browser Session] Failed to delete log: ${err}`);
+        console.error(`[Browser Session] Failed to delete log: ${err instanceof Error ? err.message : String(err)}`);
       }
     }
   }

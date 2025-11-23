@@ -16,7 +16,7 @@ const __dirname = dirname(__filename);
 const projectRoot = join(__dirname, '..');
 const wrapperPath = join(projectRoot, 'dist', 'browser', 'native-host');
 
-const wrapperContent = `#!/opt/homebrew/bin/node
+const wrapperContent = `#!/usr/bin/env node
 
 /**
  * Native Messaging Host Wrapper
