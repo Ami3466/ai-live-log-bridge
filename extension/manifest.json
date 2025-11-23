@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "AI Live Terminal Bridge - Browser Monitor",
   "version": "1.0.0",
-  "description": "Captures browser console logs and network activity for AI debugging. Monitors localhost and development tunnels only. Requires native host installation.",
+  "description": "Captures console logs & network activity from localhost for AI debugging. Privacy-focused, local-only monitoring.",
   "permissions": [
     "nativeMessaging"
   ],
