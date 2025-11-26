@@ -252,9 +252,8 @@ AI: "Yes, two errors:
 - When troubleshooting connection issues
 
 **Returns:** Guide including:
-- Chrome extension installation steps
+- Chrome extension installation from Chrome Web Store
 - Native messaging host setup
-- Extension ID configuration
 - Connection troubleshooting
 - Common error fixes
 
@@ -379,7 +378,7 @@ All tools automatically filter to current project directory. This means:
 - ✅ 127.0.0.1:* pages
 - ❌ Regular websites (security)
 - ✅ Only from current project's localhost server
-- Requires Chrome extension installed
+- Requires Chrome extension: **[AI Live Terminal Bridge](https://chromewebstore.google.com/detail/ai-live-terminal-bridge-b/ljdggojoihiofgflmpjffflhfjejndjg)**
 
 ### Live Sessions Only
 

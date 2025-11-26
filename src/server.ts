@@ -411,17 +411,14 @@ This is not optional - it's required for the system to work.`;
             '  1. Run: `npm run verify-browser-setup` to check your configuration',
             '',
             '**Common Issues:**',
-            '  • Extension not installed → Load from chrome://extensions/',
+            '  • Extension not installed → Install from Chrome Web Store',
             '  • Extension not connected → Check that native host is registered',
             '  • No localhost pages open → Extension only monitors localhost:* pages',
-            '  • Extension ID not configured → Run: npm run update-extension-id <ID>',
             '',
             '**Quick Fix:**',
-            '  1. Ensure project is built: `npm run build`',
+            '  1. Install extension: https://chromewebstore.google.com/detail/ai-live-terminal-bridge-b/ljdggojoihiofgflmpjffflhfjejndjg',
             '  2. Install native host: `npm run install-native-host`',
-            '  3. Get extension ID from chrome://extensions/',
-            '  4. Configure ID: `npm run update-extension-id <EXTENSION_ID>`',
-            '  5. Refresh localhost page in Chrome',
+            '  3. Refresh localhost page in Chrome',
             '',
             'For detailed setup instructions, use the `get_browser_instructions` tool.',
           ];
@@ -519,35 +516,25 @@ This is not optional - it's required for the system to work.`;
 
 📦 Chrome Extension
 
-The browser monitoring extension repository:
-https://github.com/Ami3466/ai-live-log-bridge-extension
+Install from Chrome Web Store:
+https://chromewebstore.google.com/detail/ai-live-terminal-bridge-b/ljdggojoihiofgflmpjffflhfjejndjg
 
 Step 1: Install the Extension
 
-Visit the extension repository and follow the installation instructions:
-- Chrome Web Store (recommended - coming soon)
-- Manual installation (developer mode)
+Install from Chrome Web Store (link above), then click "Add to Chrome".
 
 Step 2: Configure Native Messaging
 
 After installing the extension, configure the native messaging host:
 \`\`\`bash
 npm run install-native-host
-npm run update-extension-id <YOUR_EXTENSION_ID>
 \`\`\`
-
-Get the extension ID from chrome://extensions (shown under the extension name).
 
 Step 3: Verify Connection
 
 1. Open Chrome DevTools (F12) on any localhost page
 2. Check the extension icon - it should show "Connected"
 3. If it shows "Disconnected", refresh the page
-
-📖 Full Documentation
-
-For complete setup instructions and troubleshooting:
-https://github.com/Ami3466/ai-live-log-bridge-extension
 
 🎯 How It Works
 
@@ -610,16 +597,12 @@ Shows: Only console.error, exceptions, HTTP errors (4xx/5xx)
 **Extension not connecting?**
 - Refresh the localhost page
 - Check that the MCP server is running
-- Verify the native messaging host is registered
+- Run: npm run install-native-host
 
 **No logs appearing?**
 - Make sure you're on a localhost:* page
 - Check that the extension is enabled
-- Look for errors in chrome://extensions
-
-**Extension disappeared?**
-- Extensions in "developer mode" can be disabled on Chrome restart
-- Just re-enable it in chrome://extensions`;
+- Look for errors in chrome://extensions`;
 
         return {
           content: [

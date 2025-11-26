@@ -76,6 +76,9 @@ function getManifestDir() {
   }
 }
 
+// Chrome Web Store Extension ID
+const CHROME_WEB_STORE_EXTENSION_ID = 'ljdggojoihiofgflmpjffflhfjejndjg';
+
 // Generate the native messaging host manifest
 function generateManifest() {
   return {
@@ -84,7 +87,7 @@ function generateManifest() {
     path: nativeHostPath,
     type: 'stdio',
     allowed_origins: [
-      `chrome-extension://YOUR_EXTENSION_ID/` // Will be updated after extension installation
+      `chrome-extension://${CHROME_WEB_STORE_EXTENSION_ID}/`
     ]
   };
 }
@@ -152,10 +155,9 @@ function install() {
 
   console.log('\n✅ Native Messaging Host installed successfully!\n');
   console.log('📋 Next steps:');
-  console.log('  1. Install the Chrome extension from:');
-  console.log('     https://github.com/Ami3466/ai-live-log-bridge-extension');
-  console.log('  2. Follow the setup instructions in the extension repository');
-  console.log('  3. Run: npm run update-extension-id <EXTENSION_ID>');
+  console.log('  1. Install the Chrome extension from Chrome Web Store:');
+  console.log('     https://chromewebstore.google.com/detail/ai-live-terminal-bridge-b/ljdggojoihiofgflmpjffflhfjejndjg');
+  console.log('  2. Refresh your localhost page in Chrome');
   console.log(`\n💡 The manifest file is located at: ${manifestPath}\n`);
 }
 

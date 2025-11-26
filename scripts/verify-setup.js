@@ -130,18 +130,22 @@ if (!manifestPath) {
       }
 
       // Check allowed_origins
+      const EXPECTED_EXTENSION_ID = 'ljdggojoihiofgflmpjffflhfjejndjg';
       if (manifest.allowed_origins && Array.isArray(manifest.allowed_origins)) {
-        if (manifest.allowed_origins[0] === 'chrome-extension://YOUR_EXTENSION_ID/') {
-          warning('Extension ID not configured yet. Run: npm run update-extension-id <ID>');
+        const expectedOrigin = `chrome-extension://${EXPECTED_EXTENSION_ID}/`;
+        if (manifest.allowed_origins[0] === expectedOrigin) {
+          success('Extension ID is configured correctly (Chrome Web Store)');
+          info(`Allowed origin: ${manifest.allowed_origins[0]}`);
+        } else if (manifest.allowed_origins[0] === 'chrome-extension://YOUR_EXTENSION_ID/') {
+          warning('Extension ID not configured. Run: npm run install-native-host');
           hasWarnings = true;
         } else {
-          success('Extension ID is configured');
-          info(`Allowed origin: ${manifest.allowed_origins[0]}`);
-
-          // Validate extension ID format
+          // Custom extension ID - validate format
           const match = manifest.allowed_origins[0].match(/chrome-extension:\/\/([a-p]{32})\//);
           if (match) {
-            success('Extension ID format is valid');
+            warning(`Custom extension ID configured: ${match[1]}`);
+            info('Expected Chrome Web Store ID: ' + EXPECTED_EXTENSION_ID);
+            hasWarnings = true;
           } else {
             error('Extension ID format is invalid (should be 32 lowercase letters a-p)');
             hasErrors = true;
@@ -161,49 +165,11 @@ if (!manifestPath) {
   }
 }
 
-// Check 3: Chrome extension directory
-console.log('\n3. Checking Chrome extension (optional)...');
-// Extension location is user-specific - check common locations
-const possibleExtensionPaths = [
-  join(homedir(), '.ai-live-log-bridge-extension'),
-  join(projectRoot, 'extension'),
-  join(homedir(), 'ai-live-log-bridge-extension'),
-  join(homedir(), 'Downloads', 'ai-live-log-bridge-extension'),
-];
-
-const extensionDir = possibleExtensionPaths.find(p => existsSync(p));
-
-if (extensionDir) {
-  success(`Extension directory found at: ${extensionDir}`);
-
-  // Check for manifest.json
-  const extManifestPath = join(extensionDir, 'manifest.json');
-  if (existsSync(extManifestPath)) {
-    success('Extension manifest.json exists');
-
-    try {
-      const extManifest = JSON.parse(readFileSync(extManifestPath, 'utf-8'));
-
-      if (extManifest.permissions && extManifest.permissions.includes('nativeMessaging')) {
-        success('Extension has nativeMessaging permission');
-      } else {
-        error('Extension missing nativeMessaging permission');
-        hasErrors = true;
-      }
-    } catch (err) {
-      error(`Failed to parse extension manifest: ${err.message}`);
-      hasErrors = true;
-    }
-  } else {
-    error('Extension manifest.json not found');
-    hasErrors = true;
-  }
-} else {
-  warning('Extension directory not found in common locations');
-  info('To download: npm run download-extension');
-  info('Or manually download from: https://github.com/Ami3466/ai-live-log-bridge/releases/latest');
-  info('The extension can be placed anywhere - this check is optional');
-}
+// Check 3: Chrome extension
+console.log('\n3. Checking Chrome extension...');
+info('Install the extension from Chrome Web Store:');
+info('https://chromewebstore.google.com/detail/ai-live-terminal-bridge-b/ljdggojoihiofgflmpjffflhfjejndjg');
+info('(Cannot verify Chrome Web Store extension installation from script)');
 
 // Check 4: Browser logs directory
 console.log('\n4. Checking browser logs directory...');
@@ -221,7 +187,8 @@ if (!hasErrors && !hasWarnings) {
   console.log(`${colors.green}${colors.bold}🎉 All checks passed!${colors.reset}\n`);
   console.log('Your browser monitoring setup is complete.\n');
   console.log('Next steps:');
-  console.log('  1. Load the extension in Chrome (chrome://extensions/)');
+  console.log('  1. Install the extension from Chrome Web Store:');
+  console.log('     https://chromewebstore.google.com/detail/ai-live-terminal-bridge-b/ljdggojoihiofgflmpjffflhfjejndjg');
   console.log('  2. Open a localhost page');
   console.log('  3. Check logs with: view_browser_logs MCP tool\n');
 } else if (hasErrors) {

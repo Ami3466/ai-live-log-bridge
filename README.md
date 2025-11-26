@@ -127,15 +127,15 @@ Edit `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
 **Restart Claude Desktop/Claude Code completely.**
 
-**3. Install Chrome Extension (Optional)**
+**3. Install Chrome Extension (Optional - for browser monitoring)**
 
+Install from Chrome Web Store:
+**[AI Live Terminal Bridge](https://chromewebstore.google.com/detail/ai-live-terminal-bridge-b/ljdggojoihiofgflmpjffflhfjejndjg)**
+
+Then run the native host setup:
 ```bash
-git clone https://github.com/Ami3466/ai-live-log-bridge-extension
-cd ai-live-log-bridge-extension
-npm install && npm run build && npm run install-native-host
+npm run install-native-host
 ```
-
-Then load in Chrome: chrome://extensions/ → Enable "Developer mode" → "Load unpacked" → Select `dist` directory
 
 **4. Test It**
 ```bash
@@ -166,15 +166,15 @@ Settings → Features → Model Context Protocol:
 
 **Restart Cursor completely.**
 
-**3. Install Chrome Extension (Optional)**
+**3. Install Chrome Extension (Optional - for browser monitoring)**
 
+Install from Chrome Web Store:
+**[AI Live Terminal Bridge](https://chromewebstore.google.com/detail/ai-live-terminal-bridge-b/ljdggojoihiofgflmpjffflhfjejndjg)**
+
+Then run the native host setup:
 ```bash
-git clone https://github.com/Ami3466/ai-live-log-bridge-extension
-cd ai-live-log-bridge-extension
-npm install && npm run build && npm run install-native-host
+npm run install-native-host
 ```
-
-Then load in Chrome: chrome://extensions/ → Enable "Developer mode" → "Load unpacked" → Select `dist` directory
 
 **4. Test It**
 ```bash
@@ -205,15 +205,15 @@ Navigate to MCP configuration in settings:
 
 **Restart Windsurf completely.**
 
-**3. Install Chrome Extension (Optional)**
+**3. Install Chrome Extension (Optional - for browser monitoring)**
 
+Install from Chrome Web Store:
+**[AI Live Terminal Bridge](https://chromewebstore.google.com/detail/ai-live-terminal-bridge-b/ljdggojoihiofgflmpjffflhfjejndjg)**
+
+Then run the native host setup:
 ```bash
-git clone https://github.com/Ami3466/ai-live-log-bridge-extension
-cd ai-live-log-bridge-extension
-npm install && npm run build && npm run install-native-host
+npm run install-native-host
 ```
-
-Then load in Chrome: chrome://extensions/ → Enable "Developer mode" → "Load unpacked" → Select `dist` directory
 
 **4. Test It**
 ```bash
@@ -244,15 +244,15 @@ VS Code Settings → Extensions → Cline → MCP Settings:
 
 **Restart VS Code completely.**
 
-**3. Install Chrome Extension (Optional)**
+**3. Install Chrome Extension (Optional - for browser monitoring)**
 
+Install from Chrome Web Store:
+**[AI Live Terminal Bridge](https://chromewebstore.google.com/detail/ai-live-terminal-bridge-b/ljdggojoihiofgflmpjffflhfjejndjg)**
+
+Then run the native host setup:
 ```bash
-git clone https://github.com/Ami3466/ai-live-log-bridge-extension
-cd ai-live-log-bridge-extension
-npm install && npm run build && npm run install-native-host
+npm run install-native-host
 ```
-
-Then load in Chrome: chrome://extensions/ → Enable "Developer mode" → "Load unpacked" → Select `dist` directory
 
 **4. Test It**
 ```bash
@@ -283,15 +283,15 @@ Cody Settings → MCP Configuration:
 
 **Restart your IDE completely.**
 
-**3. Install Chrome Extension (Optional)**
+**3. Install Chrome Extension (Optional - for browser monitoring)**
 
+Install from Chrome Web Store:
+**[AI Live Terminal Bridge](https://chromewebstore.google.com/detail/ai-live-terminal-bridge-b/ljdggojoihiofgflmpjffflhfjejndjg)**
+
+Then run the native host setup:
 ```bash
-git clone https://github.com/Ami3466/ai-live-log-bridge-extension
-cd ai-live-log-bridge-extension
-npm install && npm run build && npm run install-native-host
+npm run install-native-host
 ```
-
-Then load in Chrome: chrome://extensions/ → Enable "Developer mode" → "Load unpacked" → Select `dist` directory
 
 **4. Test It**
 ```bash
@@ -322,15 +322,15 @@ Find your tool's MCP settings and add:
 }
 ```
 
-**3. Install Chrome Extension (Optional)**
+**3. Install Chrome Extension (Optional - for browser monitoring)**
 
+Install from Chrome Web Store:
+**[AI Live Terminal Bridge](https://chromewebstore.google.com/detail/ai-live-terminal-bridge-b/ljdggojoihiofgflmpjffflhfjejndjg)**
+
+Then run the native host setup:
 ```bash
-git clone https://github.com/Ami3466/ai-live-log-bridge-extension
-cd ai-live-log-bridge-extension
-npm install && npm run build && npm run install-native-host
+npm run install-native-host
 ```
-
-Then load in Chrome: chrome://extensions/ → Enable "Developer mode" → "Load unpacked" → Select `dist` directory
 
 **4. Restart your tool and test**
 
@@ -669,7 +669,9 @@ rehash    # Fish
 
 ### Extension not connecting
 
-See the [Browser Extension Setup Guide](docs/BROWSER_EXTENSION_SETUP.md) for detailed troubleshooting.
+1. Make sure you installed from Chrome Web Store: **[AI Live Terminal Bridge](https://chromewebstore.google.com/detail/ai-live-terminal-bridge-b/ljdggojoihiofgflmpjffflhfjejndjg)**
+2. Run: `npm run install-native-host`
+3. Refresh your localhost page
 
 ### No browser logs appearing
 
@@ -750,10 +752,7 @@ npm uninstall -g ai-live-log-bridge
 rm -rf ~/.mcp-logs
 
 # Remove Chrome extension
-# Go to chrome://extensions/ and remove "AI Live Log Bridge - Browser Monitor"
-
-# See extension repository for more details:
-# https://github.com/Ami3466/ai-live-log-bridge-extension
+# Go to chrome://extensions/ and remove "AI Live Terminal Bridge"
 ```
 
 Remove from your AI tool's MCP config if added.
