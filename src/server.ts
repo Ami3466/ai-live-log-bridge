@@ -402,7 +402,7 @@ This is not optional - it's required for the system to work.`;
         // This ensures browser logs are matched to the correct project
         const projectDir = getMostRecentActiveProjectDir() || process.cwd();
 
-        const sessionFiles = getBrowserSessionLogFiles(undefined, projectDir, false);
+        const sessionFiles = getBrowserSessionLogFiles(undefined, projectDir, true);
 
         if (sessionFiles.length === 0) {
           // Provide more detailed troubleshooting
@@ -433,7 +433,7 @@ This is not optional - it's required for the system to work.`;
           };
         }
 
-        const recentLines = readRecentBrowserLogs(lines, 10, projectDir, false);
+        const recentLines = readRecentBrowserLogs(lines, 10, projectDir, true);
 
         return {
           content: [
@@ -451,7 +451,7 @@ This is not optional - it's required for the system to work.`;
         // Use the most recent active terminal session's project directory
         const projectDir = getMostRecentActiveProjectDir() || process.cwd();
 
-        const sessionFiles = getBrowserSessionLogFiles(undefined, projectDir, false);
+        const sessionFiles = getBrowserSessionLogFiles(undefined, projectDir, true);
 
         if (sessionFiles.length === 0) {
           return {
