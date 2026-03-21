@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git restore:*)",
+      "Bash(git pull:*)",
+      "Read(//private/var/folders/**)",
+      "Bash(ai-live-log-bridge --version)",
+      "Bash(npm list:*)",
+      "Bash(node -e \"const p=require\\(''/Users/amit/Projects/ai-live-log-bridge/package.json''\\); console.log\\(p.version\\)\")"
+    ]
+  }
+}
