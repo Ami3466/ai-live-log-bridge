@@ -223,6 +223,32 @@ export function reapDeadSessions(): number {
 }
 
 /**
+ * End ALL currently-active sessions unconditionally (dead or alive) and
+ * archive their logs. Called at wrapper startup so there is only ever one
+ * active session at a time — the fresh one about to register. This is the
+ * simplest possible invariant that makes "stale zombie sessions" impossible
+ * by construction: the state file never holds more than one entry.
+ * @returns Number of sessions ended
+ */
+export function endAllActiveSessions(): number {
+  const activePath = getActiveSessionsPath();
+  if (!existsSync(activePath)) return 0;
+
+  let active: Record<string, ActiveSessionEntry>;
+  try {
+    active = JSON.parse(readFileSync(activePath, 'utf-8'));
+  } catch {
+    return 0;
+  }
+
+  const ids = Object.keys(active);
+  for (const id of ids) {
+    markSessionCompleted(id, true);
+  }
+  return ids.length;
+}
+
+/**
  * Mark a session as completed and move its log to inactive directory
  * @param sessionId The session ID
  * @param archiveLog Whether to archive the log file to inactive directory (default: true)

@@ -9,7 +9,7 @@ import {
   registerBrowserSession,
   markBrowserSessionActive,
   markBrowserSessionCompleted,
-  cleanupStaleBrowserSessions
+  endAllActiveBrowserSessions,
 } from './browser-session.js';
 import { getMostRecentActiveProjectDir } from '../storage.js';
 
@@ -132,10 +132,10 @@ export class NativeHost {
     // Ensure browser storage directory exists
     ensureBrowserStorageExists();
 
-    // Clean up stale sessions (older than 1 day by default)
-    const keepDays = parseInt(process.env.AI_KEEP_LOGS || '1', 10);
-    const maxAgeMinutes = keepDays * 24 * 60;
-    cleanupStaleBrowserSessions(maxAgeMinutes);
+    // One-live-session-at-a-time invariant: each native-host process owns
+    // exactly one browser session. End any lingering entries from a prior
+    // crashed/killed native-host before we register ours.
+    endAllActiveBrowserSessions();
 
     // Log to stderr (stdout is reserved for native messaging protocol)
     console.error('[Native Host] Browser monitoring started');

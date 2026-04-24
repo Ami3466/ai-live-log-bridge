@@ -3,7 +3,7 @@ import { createWriteStream } from 'fs';
 import stripAnsi from 'strip-ansi';
 import chalk from 'chalk';
 import { ensureStorageExists } from './storage.js';
-import { generateSessionId, getSessionLogPath, registerSession, markSessionActive, markSessionCompleted, cleanupStaleSessions, cleanupOldInactiveLogs } from './session.js';
+import { generateSessionId, getSessionLogPath, registerSession, markSessionActive, markSessionCompleted, endAllActiveSessions, cleanupOldInactiveLogs } from './session.js';
 import { redactSecrets } from './redact-secrets.js';
 
 /**
@@ -15,14 +15,15 @@ export async function runCommandWrapper(command: string, args: string[]): Promis
   // Ensure storage directory exists
   ensureStorageExists();
 
-  // Clean up stale sessions based on AI_KEEP_LOGS setting
-  // Default is 1 day, or use configured value
-  const keepDays = parseInt(process.env.AI_KEEP_LOGS || '1', 10);
-  const maxAgeMinutes = keepDays * 24 * 60; // Convert days to minutes
-  cleanupStaleSessions(maxAgeMinutes);
+  // One-live-session-at-a-time invariant: end any previously-registered
+  // sessions (whether their wrapper is alive or zombied) before starting
+  // ours. This makes "stale active entries" impossible — the state file
+  // can't ever hold more than one live session.
+  endAllActiveSessions();
 
   // Clean up old inactive logs (older than keepDays)
   // This keeps the inactive directory from growing indefinitely
+  const keepDays = parseInt(process.env.AI_KEEP_LOGS || '1', 10);
   cleanupOldInactiveLogs(keepDays);
 
   // Generate unique session ID for this command execution

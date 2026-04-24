@@ -380,3 +380,39 @@ export function getActiveBrowserSessions(projectDir?: string): string[] {
 export function cleanupStaleBrowserSessions(_maxAgeMinutes: number = 60): number {
   return reapDeadBrowserSessions();
 }
+
+/**
+ * End ALL currently-active browser sessions unconditionally and archive
+ * their logs. Called at native-host startup so each new SW connection
+ * starts clean — no stale session entries can linger.
+ * @returns Number of sessions ended
+ */
+export function endAllActiveBrowserSessions(): number {
+  const activePath = getActiveBrowserSessionsPath();
+  if (!existsSync(activePath)) return 0;
+
+  let active: Record<string, ActiveBrowserSessionEntry>;
+  try {
+    active = JSON.parse(readFileSync(activePath, 'utf-8'));
+  } catch {
+    return 0;
+  }
+
+  const ids = Object.keys(active);
+  if (ids.length === 0) return 0;
+
+  // Archive each log file, then clear the state map in one write.
+  for (const id of ids) {
+    const activeLogPath = getBrowserSessionLogPath(id, true);
+    const inactiveLogPath = getBrowserSessionLogPath(id, false);
+    if (existsSync(activeLogPath)) {
+      try { renameSync(activeLogPath, inactiveLogPath); } catch { /* best-effort */ }
+    }
+  }
+
+  try {
+    writeFileSync(activePath, '{}', 'utf-8');
+  } catch { /* best-effort */ }
+
+  return ids.length;
+}
