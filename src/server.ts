@@ -7,9 +7,117 @@ import {
   ListToolsRequestSchema,
   Tool,
 } from '@modelcontextprotocol/sdk/types.js';
-import { existsSync } from 'fs';
+import { existsSync, readFileSync, unlinkSync } from 'fs';
 import { LOG_FILE, readRecentLogs, getSessionLogFiles, getMostRecentActiveProjectDir } from './storage.js';
 import { readRecentBrowserLogs, getBrowserSessionLogFiles } from './browser/browser-storage.js';
+import { reapDeadSessions, getActiveSessions, isProcessAlive } from './session.js';
+import { reapDeadBrowserSessions } from './browser/browser-session.js';
+import { NATIVE_HOST_STATUS_PATH } from './browser/native-host.js';
+
+type NativeHostStatus = {
+  pid: number;
+  connectedAt: string;
+  firstHeartbeatAt: string | null;
+  lastHeartbeatAt: string | null;
+  lastActivityAt: string | null;
+  sessionsStarted: number;
+  currentSessionId: string | null;
+  msgCount: Record<string, number>;
+  captureCount: number;
+};
+
+/**
+ * Read the native-host status file. Returns null if the file is missing
+ * or the owning process is dead (stale file from a crashed native host).
+ * Stale files are unlinked so we don't repeatedly report bad state.
+ */
+function readNativeHostStatus(): NativeHostStatus | null {
+  if (!existsSync(NATIVE_HOST_STATUS_PATH)) return null;
+  try {
+    const s = JSON.parse(readFileSync(NATIVE_HOST_STATUS_PATH, 'utf-8')) as NativeHostStatus;
+    if (!isProcessAlive(s.pid)) {
+      try { unlinkSync(NATIVE_HOST_STATUS_PATH); } catch { /* best-effort */ }
+      return null;
+    }
+    return s;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Build a precise, actionable status block for the browser tools.
+ * Answers three distinct states the old "no logs" message conflated:
+ *   1. No native host running at all → extension not installed/connected.
+ *   2. Native host running + heartbeats but zero capture events → extension
+ *      connected but content.js never injected (usually missing host permission
+ *      for localhost), OR user hasn't visited a localhost page.
+ *   3. Native host running + capture events → everything healthy.
+ */
+function browserStatusReport(): { healthy: boolean; text: string } {
+  const s = readNativeHostStatus();
+  if (!s) {
+    return {
+      healthy: false,
+      text: [
+        '❌ Browser extension NOT connected.',
+        '',
+        'No native-messaging host process is running. Either the extension is not installed,',
+        'the native host manifest is missing, or Chrome isn\'t launching it.',
+        '',
+        'Fix:',
+        '  1. Install extension: https://chromewebstore.google.com/detail/ljdggojoihiofgflmpjffflhfjejndjg',
+        '  2. Run: npm run install-native-host',
+        '  3. Restart Chrome, open a localhost page.',
+      ].join('\n'),
+    };
+  }
+
+  const now = Date.now();
+  const hbAge = s.lastHeartbeatAt ? (now - new Date(s.lastHeartbeatAt).getTime()) / 1000 : Infinity;
+
+  if (s.captureCount === 0) {
+    const hbLine = s.lastHeartbeatAt
+      ? `Extension heartbeat alive (last ${Math.round(hbAge)}s ago, ${s.msgCount.heartbeat} total).`
+      : 'No heartbeats received yet — extension service worker has connected but hasn\'t reported in.';
+    return {
+      healthy: false,
+      text: [
+        '⚠️  Browser extension connected, but NOT capturing page events.',
+        '',
+        hbLine,
+        `Capture events (console/network/error): 0`,
+        '',
+        'Most likely cause: the extension lacks host permission for http://localhost/*.',
+        'Without it, chrome.scripting.executeScript silently fails and content.js never injects.',
+        '',
+        'Verify in chrome://extensions/ → Details → Site access = "On all sites"',
+        '(or load the unpacked extension at ~/ai-live-log-bridge-unpacked which requires the',
+        'permission at install time instead of relying on runtime grants).',
+      ].join('\n'),
+    };
+  }
+
+  return { healthy: true, text: '' };
+}
+
+/**
+ * Resolve which project directory to filter logs by.
+ * Runs a reap first so "live" project detection doesn't see zombie sessions.
+ * Prefers cwd if it has an active session, else falls back to the most recent
+ * active project (covers the case where MCP is spawned from an install dir
+ * that differs from the user's actual working project).
+ */
+function resolveProjectDir(): string {
+  reapDeadSessions();
+  reapDeadBrowserSessions();
+
+  const cwd = process.cwd();
+  if (getActiveSessions(cwd).length > 0) {
+    return cwd;
+  }
+  return getMostRecentActiveProjectDir() || cwd;
+}
 
 /**
  * MCP Server Mode
@@ -126,8 +234,9 @@ export async function startMCPServer(): Promise<void> {
     try {
       if (name === 'view_logs') {
         const lines = (args?.lines as number) || 100;
+        const projectDir = resolveProjectDir();
 
-        const sessionFiles = getSessionLogFiles(undefined, process.cwd(), true);
+        const sessionFiles = getSessionLogFiles(undefined, projectDir, true);
 
         // Check if we have any logs (session files or legacy file)
         if (sessionFiles.length === 0 && !existsSync(LOG_FILE)) {
@@ -142,7 +251,7 @@ export async function startMCPServer(): Promise<void> {
         }
 
         // Use the new readRecentLogs function to read from session files
-        const recentLines = readRecentLogs(lines, 10, process.cwd(), true);
+        const recentLines = readRecentLogs(lines, 10, projectDir, true);
 
         return {
           content: [
@@ -156,8 +265,9 @@ export async function startMCPServer(): Promise<void> {
 
       if (name === 'get_crash_context') {
         const lines = (args?.lines as number) || 100;
+        const projectDir = resolveProjectDir();
 
-        const sessionFiles = getSessionLogFiles(undefined, process.cwd(), true);
+        const sessionFiles = getSessionLogFiles(undefined, projectDir, true);
 
         // Check if we have any logs (session files or legacy file)
         if (sessionFiles.length === 0 && !existsSync(LOG_FILE)) {
@@ -172,7 +282,7 @@ export async function startMCPServer(): Promise<void> {
         }
 
         // Use the new readRecentLogs function to read from session files
-        const content = readRecentLogs(lines, 10, process.cwd(), true);
+        const content = readRecentLogs(lines, 10, projectDir, true);
         const recentLines = content.split('\n');
 
         // Error detection patterns (same as auto_fix_errors)
@@ -223,8 +333,9 @@ export async function startMCPServer(): Promise<void> {
 
       if (name === 'auto_fix_errors') {
         const lines = (args?.lines as number) || 200;
+        const projectDir = resolveProjectDir();
 
-        const sessionFiles = getSessionLogFiles(undefined, process.cwd(), true);
+        const sessionFiles = getSessionLogFiles(undefined, projectDir, true);
 
         // Check if we have any logs (session files or legacy file)
         if (sessionFiles.length === 0 && !existsSync(LOG_FILE)) {
@@ -239,7 +350,7 @@ export async function startMCPServer(): Promise<void> {
         }
 
         // Use the new readRecentLogs function to read from session files
-        const content = readRecentLogs(lines, 10, process.cwd(), true);
+        const content = readRecentLogs(lines, 10, projectDir, true);
         const recentLines = content.split('\n');
 
         // Error detection patterns
@@ -397,40 +508,15 @@ This is not optional - it's required for the system to work.`;
 
       if (name === 'view_browser_logs') {
         const lines = (args?.lines as number) || 100;
-
-        // Use the most recent active terminal session's project directory
-        // This ensures browser logs are matched to the correct project
-        const projectDir = getMostRecentActiveProjectDir() || process.cwd();
+        const projectDir = resolveProjectDir();
 
         const sessionFiles = getBrowserSessionLogFiles(undefined, projectDir, true);
 
         if (sessionFiles.length === 0) {
-          // Provide more detailed troubleshooting
-          const setupChecks = [
-            '**Setup Verification:**',
-            '  1. Run: `npm run verify-browser-setup` to check your configuration',
-            '',
-            '**Common Issues:**',
-            '  • Extension not installed → Install from Chrome Web Store',
-            '  • Extension not connected → Check that native host is registered',
-            '  • No localhost pages open → Extension only monitors localhost:* pages',
-            '',
-            '**Quick Fix:**',
-            '  1. Install extension: https://chromewebstore.google.com/detail/ai-live-terminal-bridge-b/ljdggojoihiofgflmpjffflhfjejndjg',
-            '  2. Install native host: `npm run install-native-host`',
-            '  3. Refresh localhost page in Chrome',
-            '',
-            'For detailed setup instructions, use the `get_browser_instructions` tool.',
-          ];
-
-          return {
-            content: [
-              {
-                type: 'text',
-                text: `❌ No Browser Logs Found\n\nNo active browser sessions detected for this project.\n\n${setupChecks.join('\n')}`,
-              },
-            ],
-          };
+          // No log files — but is that because the extension isn't connected,
+          // or because it's connected and silent? The status report knows.
+          const status = browserStatusReport();
+          return { content: [{ type: 'text', text: status.text }] };
         }
 
         const recentLines = readRecentBrowserLogs(lines, 10, projectDir, true);
@@ -447,21 +533,13 @@ This is not optional - it's required for the system to work.`;
 
       if (name === 'get_browser_errors') {
         const lines = (args?.lines as number) || 100;
-
-        // Use the most recent active terminal session's project directory
-        const projectDir = getMostRecentActiveProjectDir() || process.cwd();
+        const projectDir = resolveProjectDir();
 
         const sessionFiles = getBrowserSessionLogFiles(undefined, projectDir, true);
 
         if (sessionFiles.length === 0) {
-          return {
-            content: [
-              {
-                type: 'text',
-                text: '❌ No Browser Logs Found\n\nCannot check for browser errors - no active browser sessions detected.\n\n**Quick Diagnostics:**\n  1. Run: `npm run verify-browser-setup`\n  2. Check that you have a localhost page open in Chrome\n  3. Verify extension is loaded at chrome://extensions/\n\nFor installation instructions, use the `get_browser_instructions` tool.',
-              },
-            ],
-          };
+          const status = browserStatusReport();
+          return { content: [{ type: 'text', text: status.text }] };
         }
 
         const content = readRecentBrowserLogs(lines, 10, projectDir, true);

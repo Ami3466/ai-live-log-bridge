@@ -137,25 +137,89 @@ export function getActiveSessionsPath(): string {
 }
 
 /**
+ * Check if a process with the given PID is still alive.
+ * Uses `kill(pid, 0)` which doesn't send a signal — just probes existence.
+ * EPERM means the process exists but we don't own it (treat as alive).
+ * ESRCH (or any other error) means it's gone.
+ */
+export function isProcessAlive(pid: number | undefined | null): boolean {
+  if (!pid || typeof pid !== 'number' || pid <= 0) {
+    return false;
+  }
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException)?.code;
+    return code === 'EPERM';
+  }
+}
+
+type ActiveSessionEntry = {
+  projectDir: string;
+  startTime: string;
+  pid?: number;
+};
+
+/**
  * Mark a session as active (running)
  * @param sessionId The session ID
  * @param projectDir The project directory
+ * @param pid The PID of the process owning this session (defaults to current process)
  */
-export function markSessionActive(sessionId: string, projectDir: string): void {
+export function markSessionActive(sessionId: string, projectDir: string, pid: number = process.pid): void {
   const activePath = getActiveSessionsPath();
-  let active: Record<string, { projectDir: string; startTime: string }> = {};
+  let active: Record<string, ActiveSessionEntry> = {};
 
   if (existsSync(activePath)) {
     const content = readFileSync(activePath, 'utf-8');
-    active = JSON.parse(content);
+    try {
+      active = JSON.parse(content);
+    } catch {
+      active = {};
+    }
   }
 
   active[sessionId] = {
     projectDir,
-    startTime: new Date().toISOString()
+    startTime: new Date().toISOString(),
+    pid
   };
 
   writeFileSync(activePath, JSON.stringify(active, null, 2), 'utf-8');
+}
+
+/**
+ * Reap sessions whose owning process is no longer alive.
+ * Legacy entries without a PID are also reaped (they predate PID tracking).
+ * Safe to call on every read — it's cheap (a kill(pid, 0) per entry) and only
+ * writes when something actually died.
+ * @returns Number of sessions reaped
+ */
+export function reapDeadSessions(): number {
+  const activePath = getActiveSessionsPath();
+  if (!existsSync(activePath)) {
+    return 0;
+  }
+
+  let active: Record<string, ActiveSessionEntry>;
+  try {
+    active = JSON.parse(readFileSync(activePath, 'utf-8'));
+  } catch {
+    return 0;
+  }
+
+  const dead: string[] = [];
+  for (const [id, data] of Object.entries(active)) {
+    if (!isProcessAlive(data.pid)) {
+      dead.push(id);
+    }
+  }
+
+  for (const id of dead) {
+    markSessionCompleted(id, true);
+  }
+  return dead.length;
 }
 
 /**
@@ -196,14 +260,21 @@ export function markSessionCompleted(sessionId: string, archiveLog: boolean = tr
  * @returns Array of active session IDs
  */
 export function getActiveSessions(projectDir?: string): string[] {
+  // Always reap dead sessions first so callers never see zombies.
+  reapDeadSessions();
+
   const activePath = getActiveSessionsPath();
 
   if (!existsSync(activePath)) {
     return [];
   }
 
-  const content = readFileSync(activePath, 'utf-8');
-  const active: Record<string, { projectDir: string; startTime: string }> = JSON.parse(content);
+  let active: Record<string, ActiveSessionEntry>;
+  try {
+    active = JSON.parse(readFileSync(activePath, 'utf-8'));
+  } catch {
+    return [];
+  }
 
   if (projectDir) {
     return Object.keys(active).filter(id => active[id].projectDir === projectDir);
@@ -213,40 +284,15 @@ export function getActiveSessions(projectDir?: string): string[] {
 }
 
 /**
- * Clean up stale sessions (sessions older than maxAgeMinutes)
- * This should be called when the ai wrapper starts to remove zombie sessions
- * from interrupted terminals.
- * @param maxAgeMinutes Maximum age of active sessions in minutes (default: 60)
+ * Clean up stale sessions. Reaps by PID (dead process → dead session), which
+ * is the authoritative signal — a long-running `npm start` idle overnight is
+ * still alive and shouldn't be reaped.
+ * The `maxAgeMinutes` param is kept for backwards compatibility but unused;
+ * PID liveness replaces the age heuristic.
  * @returns Number of stale sessions cleaned up
  */
-export function cleanupStaleSessions(maxAgeMinutes: number = 60): number {
-  const activePath = getActiveSessionsPath();
-
-  if (!existsSync(activePath)) {
-    return 0;
-  }
-
-  const content = readFileSync(activePath, 'utf-8');
-  const active: Record<string, { projectDir: string; startTime: string }> = JSON.parse(content);
-
-  const now = new Date().getTime();
-  const maxAgeMs = maxAgeMinutes * 60 * 1000;
-  let cleanedCount = 0;
-
-  // Find stale sessions
-  const staleSessionIds = Object.keys(active).filter(sessionId => {
-    const startTime = new Date(active[sessionId].startTime).getTime();
-    const age = now - startTime;
-    return age > maxAgeMs;
-  });
-
-  // Clean up stale sessions
-  for (const sessionId of staleSessionIds) {
-    markSessionCompleted(sessionId, true);
-    cleanedCount++;
-  }
-
-  return cleanedCount;
+export function cleanupStaleSessions(_maxAgeMinutes: number = 60): number {
+  return reapDeadSessions();
 }
 
 /**

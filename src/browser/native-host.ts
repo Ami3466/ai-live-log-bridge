@@ -1,7 +1,8 @@
-import { createWriteStream, WriteStream } from 'fs';
+import { createWriteStream, WriteStream, writeFileSync, existsSync, unlinkSync } from 'fs';
+import { join } from 'path';
 import { z } from 'zod';
 import { redactSecrets } from '../redact-secrets.js';
-import { ensureBrowserStorageExists } from './browser-storage.js';
+import { ensureBrowserStorageExists, BROWSER_MCP_DIR } from './browser-storage.js';
 import {
   generateBrowserSessionId,
   getBrowserSessionLogPath,
@@ -11,6 +12,25 @@ import {
   cleanupStaleBrowserSessions
 } from './browser-session.js';
 import { getMostRecentActiveProjectDir } from '../storage.js';
+
+/**
+ * Path to the native-host status file.
+ * This file is the single source of truth for "is the browser extension
+ * connected and working?" It's written by the native host on every message
+ * and on shutdown; the MCP read tools consult it to give accurate diagnostics
+ * instead of generic "no logs found" boilerplate.
+ */
+export const NATIVE_HOST_STATUS_PATH = join(BROWSER_MCP_DIR, 'native-host-status.json');
+
+type MessageCounts = {
+  heartbeat: number;
+  console: number;
+  network: number;
+  error: number;
+  performance: number;
+  'session-start': number;
+  'session-end': number;
+};
 
 /**
  * Native Messaging Host
@@ -60,6 +80,49 @@ export class NativeHost {
   private messageCount: number = 0;
   private rateLimitWindowStart: number = Date.now();
   private readonly MAX_MESSAGES_PER_SECOND = 1000;
+
+  // Status tracking — lets the MCP distinguish "extension disconnected" from
+  // "extension connected but not capturing" (usual cause: missing host permission
+  // for localhost → content.js never injects → only heartbeats flow).
+  private readonly connectedAt = new Date().toISOString();
+  private firstHeartbeatAt: string | null = null;
+  private lastHeartbeatAt: string | null = null;
+  private lastActivityAt: string | null = null;
+  private sessionsStarted: number = 0;
+  private readonly msgCount: MessageCounts = {
+    heartbeat: 0, console: 0, network: 0, error: 0,
+    performance: 0, 'session-start': 0, 'session-end': 0,
+  };
+  private statusWriteScheduled: boolean = false;
+
+  /**
+   * Write the current status file atomically-ish (one JSON write).
+   * Throttled to once per second to avoid disk thrash on hot message paths.
+   */
+  private writeStatus(): void {
+    if (this.statusWriteScheduled) return;
+    this.statusWriteScheduled = true;
+    setTimeout(() => {
+      this.statusWriteScheduled = false;
+      try {
+        const status = {
+          pid: process.pid,
+          connectedAt: this.connectedAt,
+          firstHeartbeatAt: this.firstHeartbeatAt,
+          lastHeartbeatAt: this.lastHeartbeatAt,
+          lastActivityAt: this.lastActivityAt,
+          sessionsStarted: this.sessionsStarted,
+          currentSessionId: this.sessionId,
+          msgCount: this.msgCount,
+          // Summarized "is anything actually being captured?" — content.js events.
+          captureCount: this.msgCount.console + this.msgCount.network + this.msgCount.error,
+        };
+        writeFileSync(NATIVE_HOST_STATUS_PATH, JSON.stringify(status, null, 2), 'utf-8');
+      } catch (err) {
+        console.error('[Native Host] Failed to write status:', err);
+      }
+    }, 1000);
+  }
 
   /**
    * Start the native messaging host
@@ -123,14 +186,34 @@ export class NativeHost {
       }
     });
 
-    process.stdin.on('end', () => {
+    // Write initial status immediately so MCP can see "just connected, no data yet"
+    this.writeStatus();
+
+    const shutdown = () => {
       this.endSession();
+      // Clear the status file so MCP knows the native host is gone.
+      try {
+        if (existsSync(NATIVE_HOST_STATUS_PATH)) {
+          unlinkSync(NATIVE_HOST_STATUS_PATH);
+        }
+      } catch { /* best-effort */ }
+    };
+
+    process.stdin.on('end', () => {
+      shutdown();
       console.error('[Native Host] Input stream ended');
     });
 
     // Handle process termination
-    process.on('SIGINT', () => this.endSession());
-    process.on('SIGTERM', () => this.endSession());
+    process.on('SIGINT', shutdown);
+    process.on('SIGTERM', shutdown);
+    process.on('exit', () => {
+      try {
+        if (existsSync(NATIVE_HOST_STATUS_PATH)) {
+          unlinkSync(NATIVE_HOST_STATUS_PATH);
+        }
+      } catch { /* best-effort */ }
+    });
   }
 
   /**
@@ -250,9 +333,24 @@ export class NativeHost {
     }
 
     if (message.type === 'heartbeat') {
-      // Ignore heartbeat messages - they're just to keep the connection alive
+      // Heartbeats don't carry data, but they're the key liveness signal:
+      // they prove the extension's service worker is alive and the native
+      // messaging port is open. Record them so MCP can say "extension is
+      // connected" even when content.js isn't injecting events.
+      const now = new Date().toISOString();
+      if (!this.firstHeartbeatAt) this.firstHeartbeatAt = now;
+      this.lastHeartbeatAt = now;
+      this.msgCount.heartbeat++;
+      this.writeStatus();
       return;
     }
+
+    // Track counts for every non-heartbeat message the extension actually sends.
+    if (message.type in this.msgCount) {
+      this.msgCount[message.type as keyof MessageCounts]++;
+    }
+    this.lastActivityAt = new Date().toISOString();
+    this.writeStatus();
 
     // If session is not ready, queue the message
     if (!this.sessionId || !this.logStream) {
@@ -335,6 +433,8 @@ export class NativeHost {
       const header = `[${timestamp}] Browser Session: ${this.sessionId}\n[${timestamp}] Project: ${projectDir}${urlPart}\n`;
       this.logStream.write(header);
 
+      this.sessionsStarted++;
+      this.writeStatus();
       console.error(`[Native Host] Started session: ${this.sessionId}`);
     } catch (err) {
       console.error('[Native Host] Failed to start session:', err);

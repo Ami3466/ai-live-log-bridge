@@ -174,13 +174,38 @@ export function getActiveBrowserSessionsPath(): string {
   return join(BROWSER_MCP_DIR, 'active-browser-sessions.json');
 }
 
+type ActiveBrowserSessionEntry = {
+  projectDir: string;
+  startTime: string;
+  url?: string;
+  pid?: number;
+};
+
+/**
+ * Check if a process with the given PID is still alive.
+ * See session.ts::isProcessAlive for details.
+ */
+function isProcessAlive(pid: number | undefined | null): boolean {
+  if (!pid || typeof pid !== 'number' || pid <= 0) {
+    return false;
+  }
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException)?.code;
+    return code === 'EPERM';
+  }
+}
+
 /**
  * Mark a browser session as active (running)
  * @param sessionId The browser session ID
  * @param projectDir The project directory
  * @param url The URL being monitored (optional)
+ * @param pid The PID of the native host process owning this session (defaults to current process)
  */
-export async function markBrowserSessionActive(sessionId: string, projectDir: string, url?: string): Promise<void> {
+export async function markBrowserSessionActive(sessionId: string, projectDir: string, url?: string, pid: number = process.pid): Promise<void> {
   const activePath = getActiveBrowserSessionsPath();
 
   // Acquire lock before modifying shared file
@@ -190,16 +215,21 @@ export async function markBrowserSessionActive(sessionId: string, projectDir: st
   }
 
   try {
-    let active: Record<string, { projectDir: string; startTime: string; url?: string }> = {};
+    let active: Record<string, ActiveBrowserSessionEntry> = {};
 
     if (existsSync(activePath)) {
       const content = readFileSync(activePath, 'utf-8');
-      active = JSON.parse(content);
+      try {
+        active = JSON.parse(content);
+      } catch {
+        active = {};
+      }
     }
 
     active[sessionId] = {
       projectDir,
       startTime: new Date().toISOString(),
+      pid,
       ...(url && { url })
     };
 
@@ -207,6 +237,59 @@ export async function markBrowserSessionActive(sessionId: string, projectDir: st
   } finally {
     releaseLock('active-sessions');
   }
+}
+
+/**
+ * Synchronously reap browser sessions whose native-host PID is dead.
+ * Legacy entries without a PID are reaped too.
+ * Skips the async lock — reaping races with native-host writes are rare and
+ * the blast radius is one session entry being rewritten.
+ * @returns Number of sessions reaped
+ */
+export function reapDeadBrowserSessions(): number {
+  const activePath = getActiveBrowserSessionsPath();
+  if (!existsSync(activePath)) {
+    return 0;
+  }
+
+  let active: Record<string, ActiveBrowserSessionEntry>;
+  try {
+    active = JSON.parse(readFileSync(activePath, 'utf-8'));
+  } catch {
+    return 0;
+  }
+
+  const dead: string[] = [];
+  for (const [id, data] of Object.entries(active)) {
+    if (!isProcessAlive(data.pid)) {
+      dead.push(id);
+    }
+  }
+
+  if (dead.length === 0) {
+    return 0;
+  }
+
+  for (const id of dead) {
+    delete active[id];
+    const activeLogPath = getBrowserSessionLogPath(id, true);
+    const inactiveLogPath = getBrowserSessionLogPath(id, false);
+    if (existsSync(activeLogPath)) {
+      try {
+        renameSync(activeLogPath, inactiveLogPath);
+      } catch (err) {
+        console.error(`[Browser Session] Failed to archive log during reap: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+  }
+
+  try {
+    writeFileSync(activePath, JSON.stringify(active, null, 2), 'utf-8');
+  } catch (err) {
+    console.error(`[Browser Session] Failed to write active sessions after reap: ${err instanceof Error ? err.message : String(err)}`);
+  }
+
+  return dead.length;
 }
 
 /**
@@ -266,14 +349,21 @@ export async function markBrowserSessionCompleted(sessionId: string, archiveLog:
  * @returns Array of active browser session IDs
  */
 export function getActiveBrowserSessions(projectDir?: string): string[] {
+  // Reap dead sessions first so callers never see zombies.
+  reapDeadBrowserSessions();
+
   const activePath = getActiveBrowserSessionsPath();
 
   if (!existsSync(activePath)) {
     return [];
   }
 
-  const content = readFileSync(activePath, 'utf-8');
-  const active: Record<string, { projectDir: string; startTime: string; url?: string }> = JSON.parse(content);
+  let active: Record<string, ActiveBrowserSessionEntry>;
+  try {
+    active = JSON.parse(readFileSync(activePath, 'utf-8'));
+  } catch {
+    return [];
+  }
 
   if (projectDir) {
     return Object.keys(active).filter(id => active[id].projectDir === projectDir);
@@ -283,36 +373,10 @@ export function getActiveBrowserSessions(projectDir?: string): string[] {
 }
 
 /**
- * Clean up stale browser sessions (sessions older than maxAgeMinutes)
- * @param maxAgeMinutes Maximum age of active sessions in minutes (default: 60)
+ * Clean up stale browser sessions. PID liveness is authoritative — an idle
+ * browser tab whose native host is still running is NOT stale.
  * @returns Number of stale sessions cleaned up
  */
-export function cleanupStaleBrowserSessions(maxAgeMinutes: number = 60): number {
-  const activePath = getActiveBrowserSessionsPath();
-
-  if (!existsSync(activePath)) {
-    return 0;
-  }
-
-  const content = readFileSync(activePath, 'utf-8');
-  const active: Record<string, { projectDir: string; startTime: string }> = JSON.parse(content);
-
-  const now = new Date().getTime();
-  const maxAgeMs = maxAgeMinutes * 60 * 1000;
-  let cleanedCount = 0;
-
-  // Find stale sessions
-  const staleSessionIds = Object.keys(active).filter(sessionId => {
-    const startTime = new Date(active[sessionId].startTime).getTime();
-    const age = now - startTime;
-    return age > maxAgeMs;
-  });
-
-  // Clean up stale sessions
-  for (const sessionId of staleSessionIds) {
-    markBrowserSessionCompleted(sessionId, true);
-    cleanedCount++;
-  }
-
-  return cleanedCount;
+export function cleanupStaleBrowserSessions(_maxAgeMinutes: number = 60): number {
+  return reapDeadBrowserSessions();
 }
